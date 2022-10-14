@@ -29,8 +29,8 @@ def nipals(x: np.ndarray, y: np.ndarray,
         Weights with size p by 1.
     u: np.ndarray
         Y-scores with size n by 1.
-    c: float
-        Y-weight
+    c: np.ndarray
+        Y-weight with size 1 by 1
     t: np.ndarray
         Scores with size n by 1
     References
@@ -44,16 +44,38 @@ def nipals(x: np.ndarray, y: np.ndarray,
     i = 0
     d = tol * 10
     while d > tol and i <= max_iter:
-        w = dot(u, x) / dot(u, u)
+        w = (x.T @ u) / (u.T @ u)
         w /= la.norm(w)
-        t = dot(x, w)
-        c = dot(t, y) / dot(t, t)
-        u_new = y * c / (c * c)
+        t = x @ w
+        c = t.T @ y / (t.T @ t)
+        u_new = y @ c / (c.T @ c)
         d = la.norm(u_new - u) / la.norm(u_new)
+        # TODO: remove
+        print(f"Iteration {i}: d={d}")
         u = u_new
         i += 1
 
     return w, u, c, t
+    
+def center_scale_x_y(
+        x: np.ndarray, y: np.ndarray, scale: bool=False
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    x_mean = x.mean(axis=0)
+    y_mean = y.mean(axis=0)
+    x-=x_mean
+    y-=y_mean
+    if(scale):
+        x_std = x.std(axis=0, ddof=1)
+        y_std = y.std(axis=0, ddof=1)
+        x /= x_std
+        y /= y_std
+    else:
+        x_std = np.ones(x.shape[1])
+        y_std = np.ones(y.shape[1])
+
+    
+    return x, y, x_mean, y_mean, x_std, y_std
+
 
 
 class OPLS:
@@ -72,11 +94,17 @@ class OPLS:
     orthogonal_scores: np.ndarray
         Orthogonal scores.
     """
-    def __init__(self):
+    def __init__(self, n_components: int = None, copy: bool = True, scale: bool = True):
         """
         TODO:
             1. add arg for specifying the method for performing PLS
         """
+        # Data centering and scaling
+        self.x_mean: np.ndarray = None
+        self.y_mean: np.ndarray = None
+        self.x_std:  np.ndarray = None
+        self.y_std:  np.ndarray = None
+        
         # orthogonal score matrix
         self._Tortho: np.ndarray = None
         # orthogonal loadings
@@ -95,7 +123,13 @@ class OPLS:
         # total number of components
         self.npc: int = None
 
-    def fit(self, x, y, n_comp=None, dot=np.dot) -> None:
+        # Parameters
+        self.scale: bool = scale
+        self.copy:  bool = copy
+        self.n_components: int = n_components
+
+
+    def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS":
         """
         Fit PLS model.
         Parameters
@@ -119,10 +153,24 @@ class OPLS:
             regression (LVR) method with a integral OSC filter.
             J Chemometrics. 2003, 17, 53-64.
         """
+        if(self.copy):
+            X = x.copy()
+            Y = y.copy()
+        else:
+            X = x
+            Y = y
         n, p = x.shape
         npc = min(n, p)
+        n_comp = self.n_components
         if n_comp is not None and n_comp < npc:
             npc = n_comp
+        
+        if(Y.ndim==1):
+            Y = Y[:,np.newaxis]
+        if(Y.shape[1]!=1):
+            raise NotImplementedError(f"Multivariate OPLS is not yet implemented, y should be shape(n,1), or shape(n), is shape{y.shape}")
+        
+        X, Y, self.x_mean, self.y_mean, self.x_std, self.y_std = center_scale_x_y(X, Y,scale=self.scale)
 
         # initialization
         Tortho = np.empty((n, npc))
@@ -131,50 +179,54 @@ class OPLS:
         T, P, C = np.empty((n, npc)), np.empty((p, npc)), np.empty(npc)
 
         # X-y variations
-        tw = dot(y, x) / dot(y, y)
+        tw = (X.T @ Y) / (Y.T @ Y)
+        print(tw.shape)
         tw /= la.norm(tw)
         # predictive scores
-        tp = dot(x, tw)
-        # components
-        w, u, _, t = nipals(x, y)
-        p = dot(t, x) / dot(t, t)
+        tp = X @ tw
+        # initial component
+        w, u, _, t = nipals(X, Y)
+        p = (X.T @ t) / (t.T @ t)
+        print(p.shape)
         for nc in range(npc):
             # orthoganol weights
-            w_ortho = p - (dot(tw, p) * tw)
+            w_ortho = p - ((tw.T @ p) * tw)
             w_ortho /= la.norm(w_ortho)
             # orthoganol scores
-            t_ortho = dot(x, w_ortho)
+            t_ortho = X @ w_ortho
             # orthoganol loadings
-            p_ortho = dot(t_ortho, x) / dot(t_ortho, t_ortho)
+            p_ortho = (X.T @ t_ortho) / (t_ortho.T @ t_ortho)
             # update X to the residue matrix
-            x_filt = x - t_ortho[:, np.newaxis] * p_ortho # in pace change
+            X -= t_ortho @ p_ortho.T # in pace change
             # save to matrix
-            Tortho[:, nc] = t_ortho
-            Portho[:, nc] = p_ortho
-            Wortho[:, nc] = w_ortho
+            Tortho[:, nc] = t_ortho.squeeze()
+            Portho[:, nc] = p_ortho.squeeze()
+            Wortho[:, nc] = w_ortho.squeeze()
             # predictive scores
-            tp -= t_ortho * dot(p_ortho, tw)
-            T[:, nc] = tp
-            C[nc] = dot(y, tp) / dot(tp, tp)
+            tp -= t_ortho * (p_ortho.T @ tw)
+            T[:, nc] = tp.squeeze()
+            C[nc] = (y.T @ tp) / (tp.T @ tp)
 
             # next component
-            w, u, _, t = nipals(x_filt, y)
-            p = dot(t, x_filt) / dot(t, t)
-            P[:, nc] = p
+            w, u, _, t = nipals(X, Y)
+            p = (X.T @ t) / (t.T @ t)
+            P[:, nc] = p.squeeze()
 
         self._Tortho = Tortho
         self._Portho = Portho
         self._Wortho = Wortho
         # covariate weights
-        self._w = tw
+        self._w = tw.squeeze()
 
         # coefficients and predictive scores
         self._T = T
         self._P = P
         self._C = C
-        self.coef = tw * C[:, np.newaxis]
+        self.coef = self._w * C[:, np.newaxis]
 
         self.npc = npc
+
+        return self
 
     def predict(
             self, X, n_component=None, return_scores=False
@@ -186,9 +238,9 @@ class OPLS:
 
         y = np.dot(X, coef)
         if return_scores:
-            return y, np.dot(X, self._w)
+            return y*self.y_std+self.y_mean, np.dot(X, self._w)
 
-        return y
+        return y*self.y_std+self.y_mean
 
     def correct(
             self, x, n_component=None, return_scores=False, dot=np.dot
@@ -234,9 +286,9 @@ class OPLS:
                 t[:, nc] = t_
 
         if return_scores:
-            return xc, t
+            return xc*self.x_std+self.x_mean, t
 
-        return xc
+        return xc*self.x_std+self.x_mean
 
     def predictive_score(self, n_component=None) -> np.ndarray:
         """
