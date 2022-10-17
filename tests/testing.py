@@ -52,7 +52,7 @@ fig, ax = plt.subplots(1)
 ax.plot(ncomp, pls_score, label="PLS")
 ax.plot(ncomp, opls_score, label="OPLS")
 for i in opls_pls_score:
-    ax.plot(ncomp, opls_pls_score[i], "--", color="C3", label=f"OPLS({i})-PLS")
+    ax.plot(ncomp, opls_pls_score[i], "--", label=f"OPLS({i})-PLS")
 
 ax.legend()
 fig.set_size_inches(12, 8)
