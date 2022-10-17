@@ -9,6 +9,7 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.cross_decomposition._pls import (_PLS, _center_scale_xy,
                                               _svd_flip_1d)
 from sklearn.utils import check_array, check_consistent_length
+from sklearn.utils.validation import check_is_fitted
 
 
 def nipals(x: np.ndarray, y: np.ndarray,
@@ -66,6 +67,33 @@ def nipals(x: np.ndarray, y: np.ndarray,
 class PLS(
     _PLS
 ):
+    """
+    Parameters
+    ----------
+    n_components : int, default=2
+        Number of components to fit.
+    scale : bool, default=True
+        Whether to scale X and Y to unit variance
+    flip : bool, default=False
+        Whether to flip the singular vectors for compatibility with different solvers.
+        With flip=True and deflation_mode="regression" the PLS model will be the same
+        (up to machine precision) as with sklearn.cross_decomposition.PLSRegression.
+        Does not affect the results in any other meaningful way.
+    max_iter : int, default=500
+        Maximum number of NIPALS iterations.
+    tol : float, default=1e-06
+        Tolerance for stopping NIPALS iterations.
+    copy : bool, default=True
+        Whether to make copies of X and Y. False does not guarantee calculations are in place, but
+        True does guarantee copying.
+    deflation_mode : str, default=None
+        Whether to calculate y deflation with x_scores ("regression") or y_scores ("canonical").
+        The latter only is reliable with n_components<=Y.shape[1]. The first will make this the same as
+        sklearn.cross_decomposition.PLSRegression and the latter the same as
+        sklearn.cross_decomposition.PLSCanonical.
+        In either case the first PLS component is the same.
+    """
+    # This was done mainly as a proof of concept, please use sklearn.cross_decomposition.PLSRegression in production
 
     def __init__(
         self, n_components=2, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, deflation_mode="regression",
@@ -209,10 +237,60 @@ class PLS(
 class OPLS(
     _PLS
 ):
+    """
+    Orthogonal Projection on Latent Structure (O-PLS).
+
+    Parameters
+    ----------
+    n_components : int, default=2
+        Number of components to fit.
+    scale : bool, default=True
+        Whether to scale X and Y to unit variance
+    flip : bool, default=False
+        Whether to flip the singular vectors for compatibility with different solvers.
+        With flip=True and deflation_mode="regression" the first PLS component will be
+        exactly (up to machine precision) the same as with sklearn.cross_decomposition.PLSRegression.
+        Does not affect the results in any other meaningful way.
+    max_iter : int, default=500
+        Maximum number of NIPALS iterations.
+    tol : float, default=1e-06
+        Tolerance for stopping NIPALS iterations.
+    copy : bool, default=True
+        Whether to make copies of X and Y. False does not guarantee everything is in place, but
+        True does guarantee copying.
+    algorithm : str, default="OPLS"
+        The algorithm to use. Acceptable values are "OPLS" and "O2PLS".
+        NOTE: "O2PLS" is not yet well tested, and OPLS is only tested with univariate y.
+    deflation_mode : str, default=None
+        Whether to calculate y deflation with x_scores ("regression") or y_scores ("canonical").
+        The latter only is reliable with n_components<=Y.shape[1].
+        With OPLS algorithm this only changes the y-loadings, y-rotations and the final regressor, so
+        it does not affect the corrected coordinates.
+        With O2PLS algorithm "canonical" should be used.
+        If None, "regression" is used for OPLS and "canonical" with O2PLS.
+
+    Attributes
+    ----------
+    predictive_scores: np.ndarray
+        Predictive x-scores.
+    predictive_loadings: np.ndarray
+        Predictive x-loadings.
+    orthogonal_loadings: np.ndarray
+        Orthogonal x-loadings.
+    orthogonal_scores: np.ndarray
+        Orthogonal x-scores.
+
+    """
 
     def __init__(
-        self, n_components=2, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, deflation_mode="regression",
+        self, n_components=2, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None,
     ):
+        if (deflation_mode is None):
+            if (algorithm == "OPLS"):
+                deflation_mode = "regression"
+            elif (algorithm == "OPLS"):
+                deflation_mode = "canonical"
+
         super().__init__(
             n_components=n_components,
             scale=scale,
@@ -227,20 +305,22 @@ class OPLS(
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS":
         """
-        Fit PLS model.
+        Fit OPLS model.
         Parameters
         ----------
         x: np.ndarray
             Variable matrix with size n samples by xd variables.
         y: np.ndarray
-            Dependent matrix with size n samples by yd, or a vector. For now only t==1 is implemented.
+            Dependent matrix with size n samples by yd, or a vector. For now only t==1 is tested.
         n_comp: int
             Number of components, default is None, which indicates that
             largest dimension which is smaller value between n and p
             will be used.
+
         Returns
         -------
-        PLS object
+        Fitted OPLS object (reference to self)
+
         Reference
         ---------
         [1] Trygg J, Wold S. Orthogonal projection on Latent Structure (OPLS).
@@ -309,9 +389,11 @@ class OPLS(
             # Regress p to minimize error in Xhat = t p^T
             p = (X.T @ t) / (t.T @ t)
 
+            # find orthogonal weights
             w_ortho = p-((w.T @ p) / (w.T @ w))*w
             w_ortho /= la.norm(w_ortho)
 
+            # with the orthogonal weights, calculate orthogonal scores and loadings
             t_ortho = (X @ w_ortho) / (w_ortho.T @ w_ortho)
             p_ortho = (X.T @ t_ortho) / (t_ortho.T @ t_ortho)
 
@@ -319,12 +401,15 @@ class OPLS(
             X -= t_ortho @ p_ortho.T
 
             if (self.algorithm == "O2PLS"):
+                # In O2PLS we also calculate y-loadings and deflate y
                 if (self.deflation_mode == "canonical"):
                     # Regress q to minimize error in Yhat = u q^T
                     q = (Y.T @ u) / (u.T @ u)
+                    # find orthogonal weights
                     c_ortho = q-((c.T @ q) / (c.T @ c))*c
                     c_ortho /= la.norm(c_ortho)
 
+                    # with the orthogonal weights, calculate orthogonal scores and loadings
                     u_ortho = (Y @ c_ortho) / (c_ortho.T @ c_ortho)
                     q_ortho = (Y.T @ u_ortho) / (u_ortho.T @ u_ortho)
 
@@ -334,14 +419,16 @@ class OPLS(
                     # In regression mode only x score (u) is used
                     # Regress q to minimize error in Yhat = u p^T
                     q = (Y.T @ t) / (t.T @ t)
+                    # find orthogonal weights
                     c_ortho = q-((c.T @ q) / (c.T @ c))*c
                     c_ortho /= la.norm(c_ortho)
 
+                    # with the orthogonal weights, calculate orthogonal scores and loadings
                     u_ortho = (Y @ c_ortho) / (c_ortho.T @ c_ortho)
                     q_ortho = (Y.T @ t_ortho) / (t_ortho.T @ t_ortho)
                     # deflate y
                     Y -= t_ortho @ q_ortho.T
-            else:
+            elif (self.algorithm == "OPLS"):
                 if (self.deflation_mode == "canonical"):
                     # Regress q to minimize error in Yhat = u q^T
                     q = (Y.T @ u) / (u.T @ u)
@@ -349,6 +436,9 @@ class OPLS(
                     # In regression mode only x score (u) is used
                     # Regress q to minimize error in Yhat = u p^T
                     q = (Y.T @ t) / (t.T @ t)
+            else:
+                raise ValueError(
+                    f"algorithm=={self.algorithm} is not supported. Supported values are \"OPLS\" and \"O2PLS\"")
 
             W[:, k] = w.squeeze(axis=1)
             U[:, k] = u.squeeze(axis=1)
@@ -400,9 +490,40 @@ class OPLS(
         return self
 
     def transform(self, X):
+        """
+        Transform the X to the corrected coordinates.
+        Same as calling OPLS.correct(X, y=None, return_ortho=False).
+        """
         return self.correct(X, return_ortho=False)
 
     def correct(self, X, y=None, return_ortho=False):
+        """
+        Correction of X (and possibly y)
+        Parameters
+        ----------
+        X: np.ndarray
+            Data matrix with shape(n, c), where n is number of
+            samples, and c is number of variables
+        y: np.ndarray | None
+            Data matrix shape(n) or shape(n, t), where n is the number of samples
+            and t the number of features in y. If None, only X is corrected and returned.
+            If the algorithm was OPLS, the corrected y is simply a copy of y.
+        return_ortho: bool
+            Return orthogonal components of X (and possibly y). Default is False.
+        Returns
+        -------
+        x_new: np.ndarray
+            Corrected data, shape(n, c).
+        x_ortho: np.ndarray
+            Orthogonal score, shape(n, c). Returned if return _ortho=True.
+        y_new: np.ndarray
+            Corrected data, shape(n, t). Returned if y is not None.
+        y_ortho: np.ndarray
+            Orthogonal score, shape(n, t). Returned if y is not None and return _ortho=True.
+        """
+        check_is_fitted(self)
+        # TODO: Check X type and dimension consistencies between X and
+        #       scores in model.
         x_new = X.copy()
         x_new -= self._x_mean
         x_new /= self._x_std
@@ -410,6 +531,8 @@ class OPLS(
 
         if (not y is None):
             y_new = y.copy()
+            if (len(y_new.shape) == 1):
+                y_new = y_new[:, np.newaxis]
 
         correct_y = (not y is None) and self.algorithm == "O2PLS"
 
@@ -460,6 +583,8 @@ class OPLS(
         return x_new, x_ortho
 
     def score(self, X, y=None):
+        if (self.algorithm == "O2PLS"):
+            return super().score(*self.correct(X, y))
         return super().score(self.correct(X), y)
 
     @property
