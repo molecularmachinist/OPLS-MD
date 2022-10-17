@@ -4,21 +4,25 @@ from typing import Tuple, Union
 
 import numpy as np
 from numpy import linalg as la
+from scipy.linalg import pinv
+from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.cross_decomposition._pls import (_PLS, _center_scale_xy,
+                                              _svd_flip_1d)
+from sklearn.utils import check_array, check_consistent_length
 
 
 def nipals(x: np.ndarray, y: np.ndarray,
            tol: float = 1e-10,
-           max_iter: int = 10000,
-           dot=np.dot) -> typing.Tuple:
+           max_iter: int = 10000) -> typing.Tuple:
     """
     Non-linear Iterative Partial Least Squares
     Parameters
     ----------
     x: np.ndarray
-        Variable matrix with size n by p, where n number of samples,
+        Variable matrix with size n by d, where n number of samples,
         p number of variables.
     y: np.ndarray
-        Dependent variable with size n by 1.
+        Dependent variable with size n by t. For now only t==1 is implemented.
     tol: float
         Tolerance for the convergence.
     max_iter: int
@@ -26,13 +30,13 @@ def nipals(x: np.ndarray, y: np.ndarray,
     Returns
     -------
     w: np.ndarray
-        Weights with size p by 1.
+        X-weights with size d by 1.
+    c: np.ndarray
+        Y-weight with size t by 1
+    t: np.ndarray
+        X-scores with size n by 1
     u: np.ndarray
         Y-scores with size n by 1.
-    c: np.ndarray
-        Y-weight with size 1 by 1
-    t: np.ndarray
-        Scores with size n by 1
     References
     ----------
     [1] Wold S, et al. PLS-regression: a basic tool of chemometrics.
@@ -40,45 +44,175 @@ def nipals(x: np.ndarray, y: np.ndarray,
     [2] Bylesjo M, et al. Model Based Preprocessing and Background
         Elimination: OSC, OPLS, and O2PLS. in Comprehensive Chemometrics.
     """
-    u = y
+    u = y[:,0]
+    u = u[:,np.newaxis]
     i = 0
     d = tol * 10
     while d > tol and i <= max_iter:
         w = (x.T @ u) / (u.T @ u)
         w /= la.norm(w)
         t = x @ w
-        c = t.T @ y / (t.T @ t)
+        c = y.T @ t  / (t.T @ t)
         u_new = y @ c / (c.T @ c)
         d = la.norm(u_new - u) / la.norm(u_new)
         # TODO: remove
-        print(f"Iteration {i}: d={d}")
+        #print(f"Iteration {i}: d={d}")
         u = u_new
         i += 1
 
-    return w, u, c, t
-    
-def center_scale_x_y(
-        x: np.ndarray, y: np.ndarray, scale: bool=False
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    x_mean = x.mean(axis=0)
-    y_mean = y.mean(axis=0)
-    x-=x_mean
-    y-=y_mean
-    if(scale):
-        x_std = x.std(axis=0, ddof=1)
-        y_std = y.std(axis=0, ddof=1)
-        x /= x_std
-        y /= y_std
-    else:
-        x_std = np.ones(x.shape[1])
-        y_std = np.ones(y.shape[1])
+    return w, c, t, u
+
+
+class PLS(
+    _PLS
+):
+
+    def __init__(
+        self, n_components=2, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, deflation_mode="regression",
+    ):
+        super().__init__(
+            n_components=n_components,
+            scale=scale,
+            deflation_mode=deflation_mode,
+            mode="A",
+            algorithm="mynipals",
+            max_iter=max_iter,
+            tol=tol,
+            copy=copy,
+        )
+        self.flip=flip
+
+    def fit(self, x: np.ndarray, y: np.ndarray) -> "PLS":
+        """
+        Fit PLS model.
+        Parameters
+        ----------
+        x: np.ndarray
+            Variable matrix with size n samples by xd variables.
+        y: np.ndarray
+            Dependent matrix with size n samples by yd, or a vector. For now only t==1 is implemented.
+        n_comp: int
+            Number of components, default is None, which indicates that
+            largest dimension which is smaller value between n and p
+            will be used.
+        Returns
+        -------
+        PLS object
+        Reference
+        ---------
+        [1] Trygg J, Wold S. Orthogonal projection on Latent Structure (OPLS).
+            J Chemometrics. 2002, 16, 119-128.
+        [2] Trygg J, Wold S. O2-PLS, a two-block (X-Y) latent variable
+            regression (LVR) method with a integral OSC filter.
+            J Chemometrics. 2003, 17, 53-64.
+        [3] https://scikit-learn.org/stable/modules/cross_decomposition.html#cross-decomposition
+        """
+        check_consistent_length(x, y)
+        X = self._validate_data(
+            x, dtype=np.float64, copy=self.copy, ensure_min_samples=2
+        )
+        Y = check_array(
+            y, input_name="Y", dtype=np.float64, copy=self.copy, ensure_2d=False
+        )    
+        if(Y.ndim==1):
+            Y = Y[:,np.newaxis]
+        
+        n, xd = X.shape
+        _, yd = Y.shape
+
+        npc = min(n, xd)
+        if self.n_components is not None and self.n_components < npc:
+            npc = self.n_components
+        else:
+            self.n_components = npc
+        
+        
+        X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(X, Y,scale=self.scale)
+        self.intercept_ = self._y_mean
+
+        #  Variable            | name       |    variable in sklearn user guide
+        W = np.empty((xd,npc)) # X-weights  |     U
+        C = np.empty((yd,npc)) # Y-weights  |     V
+        T = np.empty((n,npc))  # X-scores   |     Xi
+        U = np.empty((n,npc))  # Y-scores   |     Omega
+        P = np.empty((xd,npc)) # X-loadings |     Gamma
+        Q = np.empty((yd,npc)) # Y-loadings |     Delta
+
+        Y_eps = np.finfo(Y.dtype).eps
+        
+        for k in range(npc):
+            # Replace columns that are all close to zero with zeros
+            #Y_mask = np.all(np.abs(Y) < 10 * Y_eps, axis=0)
+            #Y[:, Y_mask] = 0.0
+
+            # Run nipals to get first singular vectors
+            w, c, t, u = nipals(X, Y, tol=self.tol, max_iter=self.max_iter)
+
+            if(self.flip):
+                # Flip for consistency across solvers
+                _svd_flip_1d(w, c)
+                # recalculate scores after flip
+                t = X @ w
+                u = Y @ c / (c.T @ c)
+
+            # Regress p to minimize error in Xhat = t p^T
+            p = (X.T @ t) / (t.T @ t)
+            # deflation of X
+            X -= t @ p.T
+
+            if(self.deflation_mode == "canonical"):
+                # Regress q to minimize error in Yhat = u q^T
+                q = (Y.T @ u) / (u.T @ u)
+                # deflate y
+                Y -= u @ q.T
+            elif(self.deflation_mode == "regression"):
+                # In regression mode only x score (u) is used
+                # Regress q to minimize error in Yhat = u p^T
+                q = (Y.T @ t) / (t.T @ t)
+                # deflate y
+                Y -= t @ q.T
+
+            
+            W[:,k] = w.squeeze(axis=1)
+            U[:,k] = u.squeeze(axis=1)
+            C[:,k] = c.squeeze(axis=1)
+            T[:,k] = t.squeeze(axis=1)
+            P[:,k] = p.squeeze(axis=1)
+            Q[:,k] = q.squeeze(axis=1)
+
+
+        self._x_weights = W
+        self._y_weights = C
+        self._x_scores = T
+        self._y_scores = U
+        self._x_loadings = P
+        self._y_loadings = Q
+
+        self.x_rotations_ = W @ pinv(P.T @ W, check_finite=False)
+        self.y_rotations_ = C @ pinv(Q.T @ C, check_finite=False)
+
+        self._coef_  = self.x_rotations_ @ Q.T
+        self._coef_ *= self._y_std
+        self._coef_  = self._coef_.T
+
+        #self.coef_ = self._coef_
+
+        # "expose" all the weights, scores and loadings
+        self.x_weights_  = self._x_weights
+        self.y_weights_  = self._y_weights
+        self.x_scores_   = self._x_scores
+        self.y_scores_   = self._y_scores
+        self.x_loadings_ = self._x_loadings
+        self.y_loadings_ = self._y_loadings
+
+        return self
 
     
-    return x, y, x_mean, y_mean, x_std, y_std
 
-
-
-class OPLS:
+class OPLS(
+    RegressorMixin,
+    BaseEstimator
+):
     """
     Orthogonal Projection on Latent Structure (O-PLS).
     Methods
@@ -170,7 +304,7 @@ class OPLS:
         if(Y.shape[1]!=1):
             raise NotImplementedError(f"Multivariate OPLS is not yet implemented, y should be shape(n,1), or shape(n), is shape{y.shape}")
         
-        X, Y, self.x_mean, self.y_mean, self.x_std, self.y_std = center_scale_x_y(X, Y,scale=self.scale)
+        X, Y, self.x_mean, self.y_mean, self.x_std, self.y_std = _center_scale_xy(X, Y,scale=self.scale)
 
         # initialization
         Tortho = np.empty((n, npc))
@@ -185,7 +319,7 @@ class OPLS:
         # predictive scores
         tp = X @ tw
         # initial component
-        w, u, _, t = nipals(X, Y)
+        w, _, u, t = nipals(X, Y)
         p = (X.T @ t) / (t.T @ t)
         print(p.shape)
         for nc in range(npc):
@@ -208,7 +342,7 @@ class OPLS:
             C[nc] = (y.T @ tp) / (tp.T @ tp)
 
             # next component
-            w, u, _, t = nipals(X, Y)
+            w, _, u, t = nipals(X, Y)
             p = (X.T @ t) / (t.T @ t)
             P[:, nc] = p.squeeze()
 
