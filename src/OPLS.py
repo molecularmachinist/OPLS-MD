@@ -44,15 +44,15 @@ def nipals(x: np.ndarray, y: np.ndarray,
     [2] Bylesjo M, et al. Model Based Preprocessing and Background
         Elimination: OSC, OPLS, and O2PLS. in Comprehensive Chemometrics.
     """
-    u = y[:,0]
-    u = u[:,np.newaxis]
+    u = y[:, 0]
+    u = u[:, np.newaxis]
     i = 0
     d = tol * 10
     while d > tol and i <= max_iter:
         w = (x.T @ u) / (u.T @ u)
         w /= la.norm(w)
         t = x @ w
-        c = y.T @ t  / (t.T @ t)
+        c = y.T @ t / (t.T @ t)
         u_new = y @ c / (c.T @ c)
         d = la.norm(u_new - u) / la.norm(u_new)
         # TODO: remove
@@ -80,7 +80,7 @@ class PLS(
             tol=tol,
             copy=copy,
         )
-        self.flip=flip
+        self.flip = flip
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "PLS":
         """
@@ -113,10 +113,10 @@ class PLS(
         )
         Y = check_array(
             y, input_name="Y", dtype=np.float64, copy=self.copy, ensure_2d=False
-        )    
-        if(Y.ndim==1):
-            Y = Y[:,np.newaxis]
-        
+        )
+        if (Y.ndim == 1):
+            Y = Y[:, np.newaxis]
+
         n, xd = X.shape
         _, yd = Y.shape
 
@@ -125,21 +125,21 @@ class PLS(
             npc = self.n_components
         else:
             self.n_components = npc
-        
-        
-        X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(X, Y,scale=self.scale)
+
+        X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(
+            X, Y, scale=self.scale)
         self.intercept_ = self._y_mean
 
         #  Variable            | name       |    variable in sklearn user guide
-        W = np.empty((xd,npc)) # X-weights  |     U
-        C = np.empty((yd,npc)) # Y-weights  |     V
-        T = np.empty((n,npc))  # X-scores   |     Xi
-        U = np.empty((n,npc))  # Y-scores   |     Omega
-        P = np.empty((xd,npc)) # X-loadings |     Gamma
-        Q = np.empty((yd,npc)) # Y-loadings |     Delta
+        W = np.empty((xd, npc))  # X-weights  |     U
+        C = np.empty((yd, npc))  # Y-weights  |     V
+        T = np.empty((n, npc))  # X-scores   |     Xi
+        U = np.empty((n, npc))  # Y-scores   |     Omega
+        P = np.empty((xd, npc))  # X-loadings |     Gamma
+        Q = np.empty((yd, npc))  # Y-loadings |     Delta
 
         Y_eps = np.finfo(Y.dtype).eps
-        
+
         for k in range(npc):
             # Replace columns that are all close to zero with zeros
             #Y_mask = np.all(np.abs(Y) < 10 * Y_eps, axis=0)
@@ -148,7 +148,7 @@ class PLS(
             # Run nipals to get first singular vectors
             w, c, t, u = nipals(X, Y, tol=self.tol, max_iter=self.max_iter)
 
-            if(self.flip):
+            if (self.flip):
                 # Flip for consistency across solvers
                 _svd_flip_1d(w, c)
                 # recalculate scores after flip
@@ -160,26 +160,24 @@ class PLS(
             # deflation of X
             X -= t @ p.T
 
-            if(self.deflation_mode == "canonical"):
+            if (self.deflation_mode == "canonical"):
                 # Regress q to minimize error in Yhat = u q^T
                 q = (Y.T @ u) / (u.T @ u)
                 # deflate y
                 Y -= u @ q.T
-            elif(self.deflation_mode == "regression"):
+            elif (self.deflation_mode == "regression"):
                 # In regression mode only x score (u) is used
                 # Regress q to minimize error in Yhat = u p^T
                 q = (Y.T @ t) / (t.T @ t)
                 # deflate y
                 Y -= t @ q.T
 
-            
-            W[:,k] = w.squeeze(axis=1)
-            U[:,k] = u.squeeze(axis=1)
-            C[:,k] = c.squeeze(axis=1)
-            T[:,k] = t.squeeze(axis=1)
-            P[:,k] = p.squeeze(axis=1)
-            Q[:,k] = q.squeeze(axis=1)
-
+            W[:, k] = w.squeeze(axis=1)
+            U[:, k] = u.squeeze(axis=1)
+            C[:, k] = c.squeeze(axis=1)
+            T[:, k] = t.squeeze(axis=1)
+            P[:, k] = p.squeeze(axis=1)
+            Q[:, k] = q.squeeze(axis=1)
 
         self._x_weights = W
         self._y_weights = C
@@ -191,23 +189,22 @@ class PLS(
         self.x_rotations_ = W @ pinv(P.T @ W, check_finite=False)
         self.y_rotations_ = C @ pinv(Q.T @ C, check_finite=False)
 
-        self._coef_  = self.x_rotations_ @ Q.T
+        self._coef_ = self.x_rotations_ @ Q.T
         self._coef_ *= self._y_std
-        self._coef_  = self._coef_.T
+        self._coef_ = self._coef_.T
 
         #self.coef_ = self._coef_
 
         # "expose" all the weights, scores and loadings
-        self.x_weights_  = self._x_weights
-        self.y_weights_  = self._y_weights
-        self.x_scores_   = self._x_scores
-        self.y_scores_   = self._y_scores
+        self.x_weights_ = self._x_weights
+        self.y_weights_ = self._y_weights
+        self.x_scores_ = self._x_scores
+        self.y_scores_ = self._y_scores
         self.x_loadings_ = self._x_loadings
         self.y_loadings_ = self._y_loadings
 
         return self
 
-    
 
 class OPLS(
     RegressorMixin,
@@ -228,6 +225,7 @@ class OPLS(
     orthogonal_scores: np.ndarray
         Orthogonal scores.
     """
+
     def __init__(self, n_components: int = None, copy: bool = True, scale: bool = True):
         """
         TODO:
@@ -238,7 +236,7 @@ class OPLS(
         self.y_mean: np.ndarray = None
         self.x_std:  np.ndarray = None
         self.y_std:  np.ndarray = None
-        
+
         # orthogonal score matrix
         self._Tortho: np.ndarray = None
         # orthogonal loadings
@@ -261,7 +259,6 @@ class OPLS(
         self.scale: bool = scale
         self.copy:  bool = copy
         self.n_components: int = n_components
-
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS":
         """
@@ -287,7 +284,7 @@ class OPLS(
             regression (LVR) method with a integral OSC filter.
             J Chemometrics. 2003, 17, 53-64.
         """
-        if(self.copy):
+        if (self.copy):
             X = x.copy()
             Y = y.copy()
         else:
@@ -298,13 +295,15 @@ class OPLS(
         n_comp = self.n_components
         if n_comp is not None and n_comp < npc:
             npc = n_comp
-        
-        if(Y.ndim==1):
-            Y = Y[:,np.newaxis]
-        if(Y.shape[1]!=1):
-            raise NotImplementedError(f"Multivariate OPLS is not yet implemented, y should be shape(n,1), or shape(n), is shape{y.shape}")
-        
-        X, Y, self.x_mean, self.y_mean, self.x_std, self.y_std = _center_scale_xy(X, Y,scale=self.scale)
+
+        if (Y.ndim == 1):
+            Y = Y[:, np.newaxis]
+        if (Y.shape[1] != 1):
+            raise NotImplementedError(
+                f"Multivariate OPLS is not yet implemented, y should be shape(n,1), or shape(n), is shape{y.shape}")
+
+        X, Y, self.x_mean, self.y_mean, self.x_std, self.y_std = _center_scale_xy(
+            X, Y, scale=self.scale)
 
         # initialization
         Tortho = np.empty((n, npc))
@@ -331,7 +330,7 @@ class OPLS(
             # orthoganol loadings
             p_ortho = (X.T @ t_ortho) / (t_ortho.T @ t_ortho)
             # update X to the residue matrix
-            X -= t_ortho @ p_ortho.T # in pace change
+            X -= t_ortho @ p_ortho.T  # in pace change
             # save to matrix
             Tortho[:, nc] = t_ortho.squeeze()
             Portho[:, nc] = p_ortho.squeeze()
