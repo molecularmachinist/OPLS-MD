@@ -154,6 +154,10 @@ class PLS(
         else:
             self.n_components = npc
 
+        if (self.n_components <= 0):
+            raise ValueError(
+                f"n_components should be positive nonzero integer, is {self.n_components}")
+
         X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(
             X, Y, scale=self.scale)
         self.intercept_ = self._y_mean
@@ -348,6 +352,10 @@ class OPLS(
             npc = self.n_components
         else:
             self.n_components = npc
+
+        if (self.n_components <= 0):
+            raise ValueError(
+                f"n_components should be positive nonzero integer, is {self.n_components}")
 
         X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(
             X, Y, scale=self.scale)
