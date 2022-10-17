@@ -1,1 +1,1 @@
-from .OPLS import OPLS, PLS
+from .OPLS import OPLS, PLS, OPLS_PLS
