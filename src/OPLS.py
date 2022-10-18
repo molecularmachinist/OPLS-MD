@@ -148,31 +148,39 @@ class PLS(
         n, xd = X.shape
         _, yd = Y.shape
 
-        npc = min(n, xd)
-        if self.n_components is not None and self.n_components < npc:
-            npc = self.n_components
+        if (self.deflation_mode == "regression"):
+            npc = min(n, xd)
+        elif (self.deflation_mode == "canonical"):
+            npc = min(n, xd, yd)
         else:
-            self.n_components = npc
+            raise ValueError(
+                f"deflation_mode=\"{self.deflation_mode}\" is not supported. Supported values are \"canonical\" and \"regression\"")
+
+        if self.n_components > npc:
+            raise ValueError(
+                f"Number of components is too large for X=shape{X.shape}, Y=shape{Y.shape} and deflation_mode={self.deflation_mode}. Maximum value is {npc}.")
 
         if (self.n_components <= 0):
             raise ValueError(
                 f"n_components should be positive nonzero integer, is {self.n_components}")
+
+        n_comp = self.n_components
 
         X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(
             X, Y, scale=self.scale)
         self.intercept_ = self._y_mean
 
         #  Variable            | name       |    variable in sklearn user guide
-        W = np.empty((xd, npc))  # X-weights  |     U
-        C = np.empty((yd, npc))  # Y-weights  |     V
-        T = np.empty((n, npc))  # X-scores   |     Xi
-        U = np.empty((n, npc))  # Y-scores   |     Omega
-        P = np.empty((xd, npc))  # X-loadings |     Gamma
-        Q = np.empty((yd, npc))  # Y-loadings |     Delta
+        W = np.empty((xd, n_comp))  # X-weights  |     U
+        C = np.empty((yd, n_comp))  # Y-weights  |     V
+        T = np.empty((n, n_comp))  # X-scores   |     Xi
+        U = np.empty((n, n_comp))  # Y-scores   |     Omega
+        P = np.empty((xd, n_comp))  # X-loadings |     Gamma
+        Q = np.empty((yd, n_comp))  # Y-loadings |     Delta
 
         Y_eps = np.finfo(Y.dtype).eps
 
-        for k in range(npc):
+        for k in range(n_comp):
             # Replace columns that are all close to zero with zeros
             #Y_mask = np.all(np.abs(Y) < 10 * Y_eps, axis=0)
             #Y[:, Y_mask] = 0.0
@@ -199,7 +207,7 @@ class PLS(
                 Y -= u @ q.T
             elif (self.deflation_mode == "regression"):
                 # In regression mode only x score (u) is used
-                # Regress q to minimize error in Yhat = u p^T
+                # Regress q to minimize error in Yhat = t q^T
                 q = (Y.T @ t) / (t.T @ t)
                 # deflate y
                 Y -= t @ q.T
@@ -292,7 +300,7 @@ class OPLS(
         if (deflation_mode is None):
             if (algorithm == "OPLS"):
                 deflation_mode = "regression"
-            elif (algorithm == "OPLS"):
+            elif (algorithm == "O2PLS"):
                 deflation_mode = "canonical"
 
         super().__init__(
@@ -300,7 +308,7 @@ class OPLS(
             scale=scale,
             deflation_mode=deflation_mode,
             mode="A",
-            algorithm="OPLS",
+            algorithm=algorithm,
             max_iter=max_iter,
             tol=tol,
             copy=copy,
@@ -347,11 +355,23 @@ class OPLS(
         n, xd = X.shape
         _, yd = Y.shape
 
-        npc = min(n, xd)
-        if self.n_components is not None and self.n_components < npc:
-            npc = self.n_components
+        if (self.deflation_mode not in ("canonical", "regression")):
+            raise ValueError(
+                f"deflation_mode=\"{self.deflation_mode}\" is not supported. Supported values are \"canonical\" and \"regression\"")
+
+        if (self.algorithm == "OPLS"):
+            npc = min(n, xd)
+        elif (self.algorithm == "O2PLS"):
+            npc = min(n, xd, yd)
         else:
-            self.n_components = npc
+            raise ValueError(
+                f"algorithm=\"{self.algorithm}\" is not supported. Supported values are \"OPLS\" and \"O2PLS\"")
+
+        if self.n_components > npc:
+            raise ValueError(
+                f"Number of components is too large for X=shape{X.shape}, Y=shape{Y.shape} and deflation_mode={self.deflation_mode}")
+
+        n_comp = self.n_components
 
         if (self.n_components <= 0):
             raise ValueError(
@@ -362,24 +382,25 @@ class OPLS(
         self.intercept_ = self._y_mean
 
         #  Variable              | name       |    variable in sklearn user guide
-        W = np.empty((xd, npc))  # X-weights  |     U
-        C = np.empty((yd, npc))  # Y-weights  |     V
-        T = np.empty((n, npc))   # X-scores   |     Xi
-        U = np.empty((n, npc))   # Y-scores   |     Omega
-        P = np.empty((xd, npc))  # X-loadings |     Gamma
-        Q = np.empty((yd, npc))  # Y-loadings |     Delta
+        W = np.empty((xd, n_comp))  # X-weights  |     U
+        C = np.empty((yd, n_comp))  # Y-weights  |     V
+        T = np.empty((n, n_comp))   # X-scores   |     Xi
+        U = np.empty((n, n_comp))   # Y-scores   |     Omega
+        P = np.empty((xd, n_comp))  # X-loadings |     Gamma
+        Q = np.empty((yd, n_comp))  # Y-loadings |     Delta
+
         # Orthogonal variables
-        Wortho = np.empty((xd, npc))  # X-weights
-        Tortho = np.empty((n, npc))   # X-scores
-        Portho = np.empty((xd, npc))  # X-loadings
+        Wortho = np.empty((xd, n_comp))  # X-weights
+        Tortho = np.empty((n, n_comp))   # X-scores
+        Portho = np.empty((xd, n_comp))  # X-loadings
         if (self.algorithm == "O2PLS"):
-            Cortho = np.empty((yd, npc))  # Y-weights  |     V
-            Uortho = np.empty((n, npc))   # Y-scores   |     Omega
-            Qortho = np.empty((yd, npc))  # Y-loadings |     Delta
+            Cortho = np.empty((yd, n_comp))  # Y-weights
+            Uortho = np.empty((n, n_comp))   # Y-scores
+            Qortho = np.empty((yd, n_comp))  # Y-loadings
 
         #Y_eps = np.finfo(Y.dtype).eps
 
-        for k in range(npc):
+        for k in range(n_comp):
             # Replace columns that are all close to zero with zeros
             #Y_mask = np.all(np.abs(Y) < 10 * Y_eps, axis=0)
             #Y[:, Y_mask] = 0.0
@@ -425,7 +446,7 @@ class OPLS(
                     Y -= u_ortho @ q_ortho.T
                 elif (self.deflation_mode == "regression"):
                     # In regression mode only x score (u) is used
-                    # Regress q to minimize error in Yhat = u p^T
+                    # Regress q to minimize error in Yhat = t q^T
                     q = (Y.T @ t) / (t.T @ t)
                     # find orthogonal weights
                     c_ortho = q-((c.T @ q) / (c.T @ c))*c
@@ -442,11 +463,8 @@ class OPLS(
                     q = (Y.T @ u) / (u.T @ u)
                 elif (self.deflation_mode == "regression"):
                     # In regression mode only x score (u) is used
-                    # Regress q to minimize error in Yhat = u p^T
+                    # Regress q to minimize error in Yhat = t q^T
                     q = (Y.T @ t) / (t.T @ t)
-            else:
-                raise ValueError(
-                    f"algorithm=={self.algorithm} is not supported. Supported values are \"OPLS\" and \"O2PLS\"")
 
             W[:, k] = w.squeeze(axis=1)
             U[:, k] = u.squeeze(axis=1)
@@ -503,6 +521,10 @@ class OPLS(
         Same as calling OPLS.correct(X, copy=copy, y=None, return_ortho=False).
         """
         return self.correct(X, copy=copy, return_ortho=False)
+
+    def inverse_transform(self, X: np.ndarray, copy: bool = True) -> np.ndarray:
+        raise NotImplementedError(
+            "OPLS is a one way filter, so inverse tranformation is nonsensical")
 
     def correct(self, X: np.ndarray, y: np.ndarray = None, copy: bool = True, return_ortho: bool = False) -> Union[
             Tuple[np.ndarray, np.ndarray], np.ndarray]:
@@ -562,11 +584,10 @@ class OPLS(
             y_new -= self._y_mean
             y_new /= self._y_std
 
-        T_ortho_new = np.empty((n, self.n_components))
-        for k in range(self.n_components):
-            wk_ortho = self._Wortho[:, k:k+1]
-            T_ortho_new[:, k:k+1] = (x_new @ wk_ortho) /   \
-                                    (wk_ortho.T @ wk_ortho)
+        # The division is not needed as Wortho should be orthonormal, so Wortho.T @ Wortho = I
+        # If the normalisation is removed, the division will be needed
+        T_ortho_new = (x_new @ self._Wortho)
+        # / np.diag(self._Wortho.T @ self._Wortho)
 
         x_ortho = T_ortho_new @ self._Portho.T
 
@@ -575,11 +596,9 @@ class OPLS(
         x_new += self._x_mean
 
         if correct_y:
-            U_ortho_new = np.empty((n, self.n_components))
-            for k in range(self.n_components):
-                ck_ortho = self._Cortho[:, k:k+1]
-                U_ortho_new[:, k:k+1] = (y_new @ ck_ortho) /   \
-                                        (ck_ortho.T @ ck_ortho)
+            # The division is not needed as Cortho should be orthonormal, so Cortho.T @ Cortho = I
+            U_ortho_new = (y_new @ self._Cortho)
+            # / np.diag(self._Cortho.T @ self._Cortho)
 
             y_ortho = U_ortho_new @ self._Qortho.T
 
