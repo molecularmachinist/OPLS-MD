@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 import typing
-from typing import Tuple, Union
+from typing import Union, Tuple
 
 import numpy as np
 from numpy import linalg as la
 from scipy.linalg import pinv
-from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.cross_decomposition._pls import (_PLS, _center_scale_xy,
                                               _svd_flip_1d)
 from sklearn.utils import check_array, check_consistent_length
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES
 
 
 def nipals(x: np.ndarray, y: np.ndarray,
            tol: float = 1e-10,
-           max_iter: int = 10000) -> typing.Tuple:
+           max_iter: int = 10000) -> Tuple[
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Non-linear Iterative Partial Least Squares
     Parameters
@@ -497,14 +497,15 @@ class OPLS(
 
         return self
 
-    def transform(self, X):
+    def transform(self, X: np.ndarray, copy: bool = True) -> np.ndarray:
         """
         Transform the X to the corrected coordinates.
-        Same as calling OPLS.correct(X, y=None, return_ortho=False).
+        Same as calling OPLS.correct(X, copy=copy, y=None, return_ortho=False).
         """
-        return self.correct(X, return_ortho=False)
+        return self.correct(X, copy=copy, return_ortho=False)
 
-    def correct(self, X, y=None, return_ortho=False):
+    def correct(self, X: np.ndarray, y: np.ndarray = None, copy: bool = True, return_ortho: bool = False) -> Union[
+            Tuple[np.ndarray, np.ndarray], np.ndarray]:
         """
         Correction of X (and possibly y)
         Parameters
@@ -516,6 +517,8 @@ class OPLS(
             Data matrix shape(n) or shape(n, t), where n is the number of samples
             and t the number of features in y. If None, only X is corrected and returned.
             If the algorithm was OPLS, the corrected y is simply a copy of y.
+        copy: bool
+            Wether to work on and return copies of data. Default is True.
         return_ortho: bool
             Return orthogonal components of X (and possibly y). Default is False.
         Returns
@@ -532,15 +535,28 @@ class OPLS(
         check_is_fitted(self)
         # TODO: Check X type and dimension consistencies between X and
         #       scores in model.
-        x_new = X.copy()
+        x_new = self._validate_data(
+            X, copy=copy, dtype=FLOAT_DTYPES, reset=False)
         x_new -= self._x_mean
         x_new /= self._x_std
         n, xd = x_new.shape
 
+        if (xd != self._x_loadings.shape[0]):
+            raise ValueError("Dimension mismatch in X, "
+                             f"the model has been trained with nd={self._x_loadings.shape[0]},"
+                             f" but X is shape{X.shape}")
+
         if (not y is None):
-            y_new = y.copy()
+            check_consistent_length(X, y)
+            y_new = Y = check_array(
+                y, input_name="Y", dtype=FLOAT_DTYPES, copy=copy, ensure_2d=False
+            )
             if (len(y_new.shape) == 1):
                 y_new = y_new[:, np.newaxis]
+            if (y.shape[1] != self._y_loadings.shape[0]):
+                raise ValueError("Dimension mismatch in y, "
+                                 f"the model has been trained with nf={self._x_loadings.shape[0]},"
+                                 f" but y is shape{X.shape}")
 
         correct_y = (not y is None) and self.algorithm == "O2PLS"
 
@@ -594,27 +610,27 @@ class OPLS(
         return super().score(*self.correct(X, y))
 
     @property
-    def predictive_scores(self):
+    def predictive_scores(self) -> np.ndarray:
         """ Orthogonal loadings. """
         return self._x_scores
 
     @property
-    def predictive_loadings(self):
+    def predictive_loadings(self) -> np.ndarray:
         """ Predictive loadings. """
         return self._x_loadings
 
     @property
-    def weights_y(self):
+    def weights_y(self) -> np.ndarray:
         """ y scores. """
         return self._y_weights
 
     @property
-    def orthogonal_loadings(self):
+    def orthogonal_loadings(self) -> np.ndarray:
         """ Orthogonal loadings. """
         return self._Portho
 
     @property
-    def orthogonal_scores(self):
+    def orthogonal_scores(self) -> np.ndarray:
         """ Orthogonal scores. """
         return self._Tortho
 
@@ -743,7 +759,7 @@ class OPLS_PLS(OPLS):
         else:
             return X, y
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         if (self.pls_components == 0):
             return super().predict(X)
@@ -751,9 +767,19 @@ class OPLS_PLS(OPLS):
         X_new = self.correct(X)
         return self.pls_.predict(X_new)
 
-    def score(self, X, y=None):
+    def score(self, X: np.ndarray, y: np.ndarray = None) -> float:
         check_is_fitted(self)
         if (self.pls_components == 0):
             return super().score(*self.correct(X, y))
 
         return self.pls_.score(*self.correct(X, y))
+
+    @property
+    def predictive_scores(self) -> np.ndarray:
+        """ Orthogonal loadings. """
+        return self._pls._x_scores
+
+    @property
+    def predictive_loadings(self) -> np.ndarray:
+        """ Predictive loadings. """
+        return self._pls._x_loadings
