@@ -246,7 +246,7 @@ class OPLS(
 
     Parameters
     ----------
-    n_components : int, default=2
+    n_components : int, default=1
         Number of components to fit.
     scale : bool, default=True
         Whether to scale X and Y to unit variance
@@ -287,7 +287,7 @@ class OPLS(
     """
 
     def __init__(
-        self, n_components=2, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None,
+        self, n_components=1, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None,
     ):
         if (deflation_mode is None):
             if (algorithm == "OPLS"):
@@ -533,8 +533,6 @@ class OPLS(
             Orthogonal score, shape(n, t). Returned if y is not None and return _ortho=True.
         """
         check_is_fitted(self)
-        # TODO: Check X type and dimension consistencies between X and
-        #       scores in model.
         x_new = self._validate_data(
             X, copy=copy, dtype=FLOAT_DTYPES, reset=False)
         x_new -= self._x_mean
