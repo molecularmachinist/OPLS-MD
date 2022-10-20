@@ -609,6 +609,8 @@ class OPLS(
 
         if not return_ortho:
             if (not y is None):
+                if (len(y.shape) == 1):
+                    return x_new, y_new.squeeze(axis=1)
                 return x_new, y_new
             return x_new
 
@@ -619,7 +621,9 @@ class OPLS(
                 y_ortho *= self._y_std
                 y_ortho += self._y_mean
             else:
-                y_ortho = np.zeros_like(y)
+                y_ortho = np.zeros_like(y_new)
+            if (len(y.shape) == 1):
+                return x_new, x_ortho, y_new.squeeze(axis=1), y_ortho.squeeze(axis=1)
             return x_new, x_ortho, y_new, y_ortho
         return x_new, x_ortho
 
