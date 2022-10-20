@@ -768,12 +768,16 @@ class OPLS_PLS(OPLS):
 
         return self
 
-    def correct(self, X, y=None):
+    def correct(self, X, y=None, copy=True, return_ortho=False):
         if (self.n_components != 0):
-            return super().correct(X, y)
+            return super().correct(X, y, copy=True, return_ortho=False)
         elif (y is None):
+            if (return_ortho):
+                return X, np.zeros_like(X)
             return X
         else:
+            if (return_ortho):
+                return X, np.zeros_like(X), y, np.zeros_like(y)
             return X, y
 
     def transform(self, X: np.ndarray) -> np.ndarray:
