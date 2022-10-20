@@ -573,7 +573,7 @@ class OPLS(
             )
             if (len(y_new.shape) == 1):
                 y_new = y_new[:, np.newaxis]
-            if (y.shape[1] != self._y_loadings.shape[0]):
+            if (y_new.shape[1] != self._y_loadings.shape[0]):
                 raise ValueError("Dimension mismatch in y, "
                                  f"the model has been trained with nf={self._x_loadings.shape[0]},"
                                  f" but y is shape{X.shape}")
