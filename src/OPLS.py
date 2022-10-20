@@ -776,6 +776,21 @@ class OPLS_PLS(OPLS):
         else:
             return X, y
 
+    def transform(self, X: np.ndarray) -> np.ndarray:
+        if (self.n_components == 0):
+            x_filt = X
+        else:
+            x_filt = super().transform(X)
+        if (self.pls_components == 0):
+            return x_filt
+        return self._pls.transform(x_filt)
+
+    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
+        if (self.pls_components == 0):
+            return self._pls.inverse_transform(X)
+        else:
+            super().inverse_transform(X)
+
     def predict(self, X: np.ndarray) -> np.ndarray:
         check_is_fitted(self)
         if (self.pls_components == 0):
