@@ -173,8 +173,8 @@ class PLS(
         #  Variable            | name       |    variable in sklearn user guide
         W = np.empty((xd, n_comp))  # X-weights  |     U
         C = np.empty((yd, n_comp))  # Y-weights  |     V
-        T = np.empty((n, n_comp))  # X-scores   |     Xi
-        U = np.empty((n, n_comp))  # Y-scores   |     Omega
+        T = np.empty((n,  n_comp))  # X-scores   |     Xi
+        U = np.empty((n,  n_comp))  # Y-scores   |     Omega
         P = np.empty((xd, n_comp))  # X-loadings |     Gamma
         Q = np.empty((yd, n_comp))  # Y-loadings |     Delta
 
