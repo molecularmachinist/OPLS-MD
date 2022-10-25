@@ -18,6 +18,37 @@ with np.load(pathlib.Path(__file__).parent.parent / "rsc" / "test_data.npz") as 
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.5, random_state=42)
 
+if (True):
+    fig, axes = plt.subplots(1, 2)
+
+    for center, scale in ((True, True), (True, False), (False, False)):
+        print(f"center={center}, scale={scale}")
+        ncomp = []
+        opls = []
+        pls = []
+        for i in range(1, 16):
+            ncomp.append(i)
+            opls.append(OPLS_PLS(n_components=1, pls_components=i, center=center,
+                        scale=scale).fit(X_train, y_train).score(X_test, y_test))
+            pls.append(PLS(n_components=i, center=center, scale=scale
+                           ).fit(X_train, y_train).score(X_test, y_test))
+        axes[0].plot(ncomp, pls,  label=f"center={center}, scale={scale}")
+        axes[1].plot(ncomp, opls, label=f"center={center}, scale={scale}")
+
+        axes[0].set_title("Pure PLS")
+        axes[1].set_title("OPLS filtering with one component")
+
+        for ax in axes:
+            ax.legend()
+            ax.set_xlabel("number of components")
+            ax.set_ylabel("Test score")
+
+    fig.set_size_inches(14, 8)
+    fig.tight_layout()
+    fig.savefig(pathlib.Path(__file__).parent / "center_scale_test.png")
+
+    quit()
+
 if (False):
     maxk = 15
 
