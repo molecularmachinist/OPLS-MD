@@ -5,10 +5,65 @@ from typing import Union, Tuple
 import numpy as np
 from numpy import linalg as la
 from scipy.linalg import pinv
-from sklearn.cross_decomposition._pls import (_PLS, _center_scale_xy,
-                                              _svd_flip_1d)
+from sklearn.cross_decomposition._pls import (_PLS, _svd_flip_1d)
 from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES
+
+
+def center_scale_data(X: np.ndarray, Y: np.ndarray, center=True, scale=True) -> Tuple[
+        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Centering and scaling of 2d arrays X and Y, along the first dimension.
+    The input array will not be copied and the returned references should match the input
+
+    Parameters
+    ----------
+    X,Y: np.ndarray
+        2d arrays of shape(n,d), shape(m,f).
+    center: bool, default=True
+        Whether to do the mean centering. If False also scaling is not done.
+    scale: bool, default=True
+        Whether to scale the data to unit variance. Effectively divides the data with the
+        respective (corrected) sample standard deviations.
+
+    Returns
+    -------
+    X: np.ndarray
+        The corrected X of shape (n,d). Should be a reference to the input X.
+    Y: np.ndarray
+        The corrected Y of shape (n,f). Should be a reference to the input Y.
+    x_mean: np.ndarray
+        shape(d) array of the means of X. If center=False, it is all zeroes.
+    y_mean: np.ndarray
+        shape(f) array of the means of Y. If center=False, it is all zeroes.
+    x_std: np.ndarray
+        shape(d) array of the standard deviations of X. Any zero values are replaced by 1.
+        if center=False or scale=False it is all ones.
+    y_std: np.ndarray
+        shape(f) array of the standard deviations of Y. Any zero values are replaced by 1.
+        if center=False or scale=False it is all ones.
+    """
+    if (center):
+        x_mean = X.mean(axis=0)
+        y_mean = Y.mean(axis=0)
+        X -= x_mean
+        Y -= y_mean
+    else:
+        x_mean = np.zeros(X.shape[1])
+        y_mean = np.zeros(Y.shape[1])
+
+    if (scale and center):
+        x_std = X.std(axis=0, ddof=1)
+        y_std = Y.std(axis=0, ddof=1)
+        x_std = np.where(x_std != 0, x_std, 1.0)
+        y_std = np.where(y_std != 0, y_std, 1.0)
+        X /= x_std
+        Y /= y_std
+    else:
+        x_std = np.ones(X.shape[1])
+        y_std = np.ones(Y.shape[1])
+
+    return X, Y, x_mean, y_mean, x_std, y_std
 
 
 def nipals(x: np.ndarray, y: np.ndarray,
@@ -17,6 +72,7 @@ def nipals(x: np.ndarray, y: np.ndarray,
         np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Non-linear Iterative Partial Least Squares
+
     Parameters
     ----------
     x: np.ndarray
@@ -28,6 +84,7 @@ def nipals(x: np.ndarray, y: np.ndarray,
         Tolerance for the convergence.
     max_iter: int
         Maximal number of iterations.
+
     Returns
     -------
     w: np.ndarray
@@ -38,6 +95,7 @@ def nipals(x: np.ndarray, y: np.ndarray,
         X-scores with size n by 1
     u: np.ndarray
         Y-scores with size n by 1.
+
     References
     ----------
     [1] Wold S, et al. PLS-regression: a basic tool of chemometrics.
@@ -96,7 +154,7 @@ class PLS(
     # This was done mainly as a proof of concept, please use sklearn.cross_decomposition.PLSRegression in production
 
     def __init__(
-        self, n_components=2, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, deflation_mode="regression",
+        self, n_components=2, *, scale=True, center=True, flip=False, max_iter=500, tol=1e-06, copy=True, deflation_mode="regression",
     ):
         super().__init__(
             n_components=n_components,
@@ -109,6 +167,7 @@ class PLS(
             copy=copy,
         )
         self.flip = flip
+        self.center = center
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "PLS":
         """
@@ -166,8 +225,8 @@ class PLS(
 
         n_comp = self.n_components
 
-        X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(
-            X, Y, scale=self.scale)
+        X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = center_scale_data(
+            X, Y, center=self.center, scale=self.scale)
         self.intercept_ = self._y_mean
 
         #  Variable            | name       |    variable in sklearn user guide
@@ -295,7 +354,7 @@ class OPLS(
     """
 
     def __init__(
-        self, n_components=1, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None,
+        self, n_components=1, *, scale=True, center=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None,
     ):
         if (deflation_mode is None):
             if (algorithm == "OPLS"):
@@ -314,10 +373,12 @@ class OPLS(
             copy=copy,
         )
         self.flip = flip
+        self.center = center
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS":
         """
         Fit OPLS model.
+
         Parameters
         ----------
         x: np.ndarray
@@ -377,8 +438,8 @@ class OPLS(
             raise ValueError(
                 f"n_components should be positive nonzero integer, is {self.n_components}")
 
-        X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = _center_scale_xy(
-            X, Y, scale=self.scale)
+        X, Y, self._x_mean, self._y_mean, self._x_std, self._y_std = center_scale_data(
+            X, Y, scale=self.scale, center=self.center)
         self.intercept_ = self._y_mean
 
         #  Variable              | name       |    variable in sklearn user guide
@@ -707,11 +768,12 @@ class OPLS_PLS(OPLS):
         The wrapped PLS model
     """
 
-    def __init__(self, n_components=1, pls_components=2, *, scale=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None):
+    def __init__(self, n_components=1, pls_components=2, *, scale=True, center=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None):
 
         super().__init__(
             n_components=n_components,
             scale=scale,
+            center=center,
             deflation_mode=deflation_mode,
             algorithm=algorithm,
             max_iter=max_iter,
@@ -762,6 +824,7 @@ class OPLS_PLS(OPLS):
             self._pls = PLS(
                 n_components=self.pls_components,
                 scale=self.scale,
+                center=self.center,
                 flip=self.flip,
                 max_iter=self.max_iter,
                 tol=self.tol,
