@@ -19,7 +19,8 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.5, random_state=42)
 
 if (True):
-    fig, axes = plt.subplots(1, 2)
+    fig1, axes1 = plt.subplots(1, 2)
+    fig2, axes2 = plt.subplots(1, 2)
 
     for center, scale in ((True, True), (True, False), (False, False)):
         print(f"center={center}, scale={scale}")
@@ -32,20 +33,30 @@ if (True):
                         scale=scale).fit(X_train, y_train).score(X_test, y_test))
             pls.append(PLS(n_components=i, center=center, scale=scale
                            ).fit(X_train, y_train).score(X_test, y_test))
-        axes[0].plot(ncomp, pls,  label=f"center={center}, scale={scale}")
-        axes[1].plot(ncomp, opls, label=f"center={center}, scale={scale}")
 
-        axes[0].set_title("Pure PLS")
-        axes[1].set_title("OPLS filtering with one component")
+        ncomp = np.array(ncomp)
+        axes1[0].plot(ncomp, pls,  label=f"center={center}, scale={scale}")
+        axes1[1].plot(ncomp, opls, label=f"center={center}, scale={scale}")
 
-        for ax in axes:
-            ax.legend()
-            ax.set_xlabel("number of components")
-            ax.set_ylabel("Test score")
+        axes2[0].plot(ncomp-((not center) and (not scale)), pls,
+                      label=f"center={center}, scale={scale}")
+        axes2[1].plot(ncomp-((not center) and (not scale)), opls,
+                      label=f"center={center}, scale={scale}")
 
-    fig.set_size_inches(14, 8)
-    fig.tight_layout()
-    fig.savefig(pathlib.Path(__file__).parent / "center_scale_test.png")
+        for axes in (axes1, axes2):
+            axes[0].set_title("Pure PLS")
+            axes[1].set_title("OPLS filtering with one component")
+
+            for ax in axes:
+                ax.legend()
+                ax.set_xlabel("number of components")
+                ax.set_ylabel("Test score")
+
+    for fig in (fig1, fig2):
+        fig.set_size_inches(14, 8)
+        fig.tight_layout()
+    fig1.savefig(pathlib.Path(__file__).parent / "center_scale_test1.png")
+    fig2.savefig(pathlib.Path(__file__).parent / "center_scale_test2.png")
 
     quit()
 
