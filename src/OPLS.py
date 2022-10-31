@@ -151,7 +151,6 @@ class PLS(
         sklearn.cross_decomposition.PLSCanonical.
         In either case the first PLS component is the same.
     """
-    # This was done mainly as a proof of concept, please use sklearn.cross_decomposition.PLSRegression in production
 
     def __init__(
         self, n_components=2, *, scale=True, center=True, flip=False, max_iter=500, tol=1e-06, copy=True, deflation_mode="regression",
