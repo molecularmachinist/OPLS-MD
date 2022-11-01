@@ -168,6 +168,12 @@ class PLS(
         self.flip = flip
         self.center = center
 
+    def __str__(self):
+        return f"{type(self).__name__}(n_components={self.n_components})"
+
+    def __repr__(self):
+        return f"{type(self).__name__}(n_components={self.n_components}, deflation_mode={self.deflation_mode})"
+
     def fit(self, x: np.ndarray, y: np.ndarray) -> "PLS":
         """
         Fit PLS model.
@@ -373,6 +379,12 @@ class OPLS(
         )
         self.flip = flip
         self.center = center
+
+    def __str__(self):
+        return f"{type(self).__name__}(n_components={self.n_components})"
+
+    def __repr__(self):
+        return f"{type(self).__name__}(n_components={self.n_components}, algorithm={self.algorithm}, deflation_mode={self.deflation_mode})"
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS":
         """
@@ -781,6 +793,12 @@ class OPLS_PLS(OPLS):
             flip=flip
         )
         self.pls_components = pls_components
+
+    def __str__(self):
+        return f"{type(self).__name__}(n_components={self.n_components})"
+
+    def __repr__(self):
+        return f"{type(self).__name__}(n_components={self.n_components}, pls_components={self.pls_components}, algorithm={self.algorithm}, deflation_mode={self.deflation_mode})"
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS_PLS":
         """
