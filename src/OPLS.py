@@ -809,6 +809,26 @@ class OPLS_PLS(OPLS):
             J Chemometrics. 2003, 17, 53-64.
         [3] https://scikit-learn.org/stable/modules/cross_decomposition.html#cross-decomposition
         """
+
+        n, xd = x.shape
+
+        if (y.ndim == 1):
+            yd = 1
+        else:
+            yd = y.shape[1]
+
+        if (self.deflation_mode == "regression"):
+            npc = min(n, xd)
+        elif (self.deflation_mode == "canonical"):
+            npc = min(n, xd, yd)
+        else:
+            raise ValueError(
+                f"deflation_mode=\"{self.deflation_mode}\" is not supported. Supported values are \"canonical\" and \"regression\"")
+
+        if (self.n_components+self.pls_components > npc):
+            raise ValueError(
+                f"Number of components is too large for X=shape{x.shape}, Y=shape{y.shape} and deflation_mode={self.deflation_mode}")
+
         if (self.n_components != 0):
             super().fit(x, y)
         elif (self.pls_components == 0):
