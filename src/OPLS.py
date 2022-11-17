@@ -136,7 +136,8 @@ class PLS(
         Whether to flip the singular vectors for compatibility with different solvers.
         With flip=True and deflation_mode="regression" the PLS model will be the same
         (up to machine precision) as with sklearn.cross_decomposition.PLSRegression.
-        Does not affect the results in any other meaningful way.
+        With flip=False and univariate y, the x_scores_ are guaranteed to be positively
+        correlated to y.
     max_iter : int, default=500
         Maximum number of NIPALS iterations.
     tol : float, default=1e-06
@@ -308,6 +309,52 @@ class PLS(
         self.y_loadings_ = self._y_loadings
 
         return self
+
+    def inverse_predict(self, Y, copy=True):
+        """Predict samples of given targets.
+        With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
+        along the given y-coordinates. For example:
+
+        >>> x_interp = pls.inverse_predict(np.linspace(y.min(), y.max(), 101))
+
+        With multivariate y this can still be used to generate interpolated structures, but it becomes a more complex combination of the coefficient vectors.
+        In such a case it might be more meaningful to manually interpolate along each of the n_components coefficient vector individually. 
+
+        Parameters
+        ----------
+        Y : np.ndarray
+            Array of shape(n_samples) or shape(n_samples, yd) targets. In the first case this is done as
+            linear interpolatio along the coefficient vector. In the latter the pseudo inverse of the coeficient matrix is calculated.
+            When yd=1 these two methods are equal (up to machine precision).
+
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+
+        Returns
+        -------
+        X_pred : np.ndarray
+            shape (n_samples,) or (n_samples, n_targets)
+            Returns predicted values.
+
+        """
+        check_is_fitted(self)
+        Y = check_array(
+            Y, input_name="Y", ensure_2d=False, copy=copy, dtype=FLOAT_DTYPES
+        )
+        # Center the Y values. _coef_ already has
+        Y -= self.intercept_
+
+        if Y.ndim == 1:
+            # This is technically equal to the below with univariate y, but doesn't require the pseudo inversing
+            scaledcoef = self._coef_ / (self._coef_**2).sum()
+            X_pred = Y[:, np.newaxis] * scaledcoef
+        else:
+            invcoef = pinv(self._coef_).T
+            X_pred = Y @ invcoef
+
+        X_pred *= self._x_std
+        X_pred += self._x_mean
+        return X_pred
 
 
 class OPLS(
@@ -563,13 +610,19 @@ class OPLS(
         self._Wortho = Wortho
         self._Tortho = Tortho
         self._Portho = Portho
+
+        self.x_rotations_ = W @ pinv(P.T @ W, check_finite=False)
+        self.y_rotations_ = C @ pinv(Q.T @ C, check_finite=False)
+
+        # orthogonal x rotations
+        self._Rortho = Wortho @ pinv(Portho.T @ Wortho, check_finite=False)
+
         if (self.algorithm == "O2PLS"):
             self._Uortho = Uortho
             self._Cortho = Cortho
             self._Qortho = Qortho
-
-        self.x_rotations_ = W @ pinv(P.T @ W, check_finite=False)
-        self.y_rotations_ = C @ pinv(Q.T @ C, check_finite=False)
+            # orthogonal y rotations
+            self._Sortho = Wortho @ pinv(Portho.T @ Wortho, check_finite=False)
 
         self._coef_ = self.x_rotations_ @ Q.T
         self._coef_ *= self._y_std
@@ -587,21 +640,135 @@ class OPLS(
 
         return self
 
-    def transform(self, X: np.ndarray, copy: bool = True) -> np.ndarray:
-        """
-        Transform the X to the corrected coordinates.
-        Same as calling OPLS.correct(X, copy=copy, y=None, return_ortho=False).
-        """
-        return self.correct(X, copy=copy, return_ortho=False)
+    def inverse_predict(self, Y, copy=True):
+        """Predict samples of given targets.
+        With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
+        along the given y-coordinates. For example:
 
-    def inverse_transform(self, X: np.ndarray, copy: bool = True) -> np.ndarray:
-        raise NotImplementedError(
-            "OPLS is a one way filter, so inverse tranformation is nonsensical")
+        >>> x_interp = pls.inverse_predict(np.linspace(y.min(), y.max(), 101))
+
+        With multivariate y this can still be used to generate interpolated structures, but it becomes a more complex combination of the coefficient vectors.
+        In such a case it might be more meaningful to manually interpolate along each of the n_components coefficient vector individually. 
+
+        Parameters
+        ----------
+        Y : np.ndarray
+            Array of shape(n_samples) or shape(n_samples, yd) targets. In the first case this is done as
+            linear interpolatio along the coefficient vector. In the latter the pseudo inverse of the coeficient matrix is calculated.
+            When yd=1 these two methods are equal (up to machine precision).
+
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+
+        Returns
+        -------
+        X_pred : np.ndarray
+            shape (n_samples,) or (n_samples, n_targets)
+            Returns predicted values.
+
+        """
+        check_is_fitted(self)
+        Y = check_array(
+            Y, input_name="Y", ensure_2d=False, copy=copy, dtype=FLOAT_DTYPES
+        )
+        # Center the Y values. _coef_ already has
+        Y -= self.intercept_
+
+        if Y.ndim == 1:
+            # This is technically equal to the below with univariate y, but doesn't require the pseudo inversing
+            scaledcoef = self._coef_ / (self._coef_**2).sum()
+            X_pred = Y[:, np.newaxis] * scaledcoef
+        else:
+            invcoef = pinv(self._coef_).T
+            X_pred = Y @ invcoef
+
+        X_pred *= self._x_std
+        X_pred += self._x_mean
+        return X_pred
+
+    def transform(self, X: np.ndarray, Y: np.ndarray = None, copy=True):
+        """Apply the dimension reduction to get the orthogonal scores.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            shape(n, xd) coordinates to transform.
+        Y : np.ndarray, default=None
+            shape(n,yd) targets to transform (optional)
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+
+        Returns
+        -------
+        x_scores : np.ndarray
+            shape(n, n_comp) orthogonal x-scores.
+        y_scores : np.ndarray
+            shape(n, n_comp) orthogonal y-scores OR unchanged Y if algorithm=="OPLS"
+            only returned if Y is not None.
+        """
+        check_is_fitted(self)
+        X = self._validate_data(X, copy=copy, dtype=FLOAT_DTYPES, reset=False)
+        # Normalize
+        X -= self._x_mean
+        X /= self._x_std
+        # calculate scores
+        x_scores = X @ self._Rortho
+        if Y is not None:
+            if (self.algorithm == "OPLS"):
+                return x_scores, Y
+            Y = check_array(
+                Y, input_name="Y", ensure_2d=False, copy=copy, dtype=FLOAT_DTYPES
+            )
+            if Y.ndim == 1:
+                Y = Y[:, np.newaxis]
+            Y -= self._y_mean
+            Y /= self._y_std
+            y_scores = Y @ self._Sortho
+            return x_scores, y_scores
+
+        return x_scores
+
+    def inverse_transform(self, X: np.ndarray, Y: np.ndarray = None):
+        """calculate inverse of the dimension reduction.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            shape(n, n_comp) scores to inverse transform.
+        Y : np.ndarray, default=None
+            shape(n, n_comp) scores to inverse transform (optional)
+
+        Returns
+        -------
+        x_scores : np.ndarray
+            shape(n, xd) estimate of X-coordinates.
+        y_scores : np.ndarray
+            shape(n, yd) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
+            only returned if Y is not None.
+        """
+        check_is_fitted(self)
+        X = check_array(X, input_name="X", dtype=FLOAT_DTYPES)
+        # calculate scores
+        x_new = X @ self._Portho.T
+        x_new *= self._x_std
+        x_new += self._x_mean
+
+        if Y is not None:
+            if (self.algorithm == "OPLS"):
+                return x_new, Y
+            Y = check_array(Y, input_name="Y", dtype=FLOAT_DTYPES)
+            y_new = Y @ self._Qortho.T
+            y_new *= self._y_std
+            y_new += self._y_mean
+            return x_new, y_new
+
+        return x_new
 
     def correct(self, X: np.ndarray, y: np.ndarray = None, copy: bool = True, return_ortho: bool = False) -> Union[
             Tuple[np.ndarray, np.ndarray], np.ndarray]:
         """
-        Correction of X (and possibly y)
+        Remove orthogonal components from X (and possibly y)
+
         Parameters
         ----------
         X: np.ndarray
@@ -615,6 +782,7 @@ class OPLS(
             Wether to work on and return copies of data. Default is True.
         return_ortho: bool
             Return orthogonal components of X (and possibly y). Default is False.
+
         Returns
         -------
         x_new: np.ndarray
@@ -658,7 +826,7 @@ class OPLS(
 
         # The division is not needed as Wortho should be orthonormal, so Wortho.T @ Wortho = I
         # If the normalisation is removed, the division will be needed
-        T_ortho_new = (x_new @ self._Wortho)
+        T_ortho_new = (x_new @ self._Rortho)
         # / np.diag(self._Wortho.T @ self._Wortho)
 
         x_ortho = T_ortho_new @ self._Portho.T
@@ -669,7 +837,7 @@ class OPLS(
 
         if correct_y:
             # The division is not needed as Cortho should be orthonormal, so Cortho.T @ Cortho = I
-            U_ortho_new = (y_new @ self._Cortho)
+            U_ortho_new = (y_new @ self._Sortho)
             # / np.diag(self._Cortho.T @ self._Cortho)
 
             y_ortho = U_ortho_new @ self._Qortho.T
@@ -731,12 +899,10 @@ class OPLS(
 class OPLS_PLS(OPLS):
     """
     Orthogonal Projection on Latent Structure (O-PLS) wrapper for a Partial Least Squares (PLS)  model.
-    The only output that differs from PLS is that from predict, which return the prediction by the wrapped PLS
-    model.
 
     Parameters
     ----------
-    n_components : int, default=2
+    n_components : int, default=1
         Number of components to fit.
     pls_components : int, default=2
         Number of components to fit.
@@ -847,79 +1013,114 @@ class OPLS_PLS(OPLS):
             raise ValueError(
                 f"Number of components is too large for X=shape{x.shape}, Y=shape{y.shape} and deflation_mode={self.deflation_mode}")
 
-        if (self.n_components != 0):
-            super().fit(x, y)
-        elif (self.pls_components == 0):
-            raise ValueError(
-                "Either n_components or pls_components should be nonzero")
-        else:
-            self.n_components = 1
-            super().fit(x, y)
-            self.n_components = 0
+        super().fit(x, y)
 
-        if (self.pls_components != 0):
-            self._pls = PLS(
-                n_components=self.pls_components,
-                scale=self.scale,
-                center=self.center,
-                flip=self.flip,
-                max_iter=self.max_iter,
-                tol=self.tol,
-                copy=self.copy,
-                deflation_mode=self.deflation_mode,
-            ).fit(*self.correct(x, y))
-            self.pls_ = self._pls
+        self._pls = PLS(
+            n_components=self.pls_components,
+            scale=self.scale,
+            center=self.center,
+            flip=self.flip,
+            max_iter=self.max_iter,
+            tol=self.tol,
+            copy=self.copy,
+            deflation_mode=self.deflation_mode,
+        ).fit(*self.correct(x, y))
+        self.pls_ = self._pls
 
         return self
 
-    def correct(self, X, y=None, copy=True, return_ortho=False):
-        if (self.n_components != 0):
-            return super().correct(X, y, copy=True, return_ortho=False)
-        elif (y is None):
-            if (return_ortho):
-                return X, np.zeros_like(X)
-            return X
-        else:
-            if (return_ortho):
-                return X, np.zeros_like(X), y, np.zeros_like(y)
-            return X, y
+    def transform(self, X: np.ndarray, Y: np.ndarray = None, copy=True) -> Union[
+            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Remove the orthogonal components and apply the dimension reduction.
 
-    def transform(self, X: np.ndarray) -> np.ndarray:
-        if (self.n_components == 0):
-            x_filt = X
-        else:
-            x_filt = super().transform(X)
-        if (self.pls_components == 0):
-            return x_filt
-        return self._pls.transform(x_filt)
+        Parameters
+        ----------
+        X : np.ndarray
+            shape(n, xd) coordinates to transform.
+        Y : np.ndarray, default=None
+            shape(n,yd) targets to transform (optional)
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
 
-    def inverse_transform(self, X: np.ndarray) -> np.ndarray:
-        if (self.pls_components == 0):
-            return self._pls.inverse_transform(X)
-        else:
-            super().inverse_transform(X)
+        Returns
+        -------
+        x_scores : np.ndarray
+            shape(n, pls_comp) x-scores.
+        y_scores : np.ndarray
+            shape(n, pls_comp) y-scores, only returned if Y is not None.
+        """
+        x_filt, y_filt = super().correct(X, Y, copy=copy)
+        return self._pls.transform(x_filt, y_filt, copy=copy)
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def inverse_transform(self, X: np.ndarray, Y: np.ndarray = None) -> Union[
+            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """calculate inverse of the dimension reduction.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            shape(n, n_comp) scores to inverse transform.
+        Y : np.ndarray, default=None
+            shape(n, n_comp) scores to inverse transform (optional)
+
+        Returns
+        -------
+        x_scores : np.ndarray
+            shape(n, xd) estimate of X-coordinates.
+        y_scores : np.ndarray
+            shape(n, yd) estimate of y-targets, only returned if Y is not None.
+        """
+        return self._pls.inverse_transform(X, Y)
+
+    def transform_ortho(self, X: np.ndarray, Y: np.ndarray = None, copy=True) -> Union[
+            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Apply the dimension reduction to get the orthogonal components.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            shape(n, xd) coordinates to transform.
+        Y : np.ndarray, default=None
+            shape(n,yd) targets to transform (optional)
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+
+        Returns
+        -------
+        x_scores : np.ndarray
+            shape(n, n_comp) orthogonal x-scores.
+        y_scores : np.ndarray
+            shape(n, n_comp) orthogonal y-scores OR unchanged Y if algorithm=="OPLS"
+            only returned if Y is not None.
+        """
+        return super().transform(X, Y, copy=copy)
+
+    def inverse_transform_ortho(self, X: np.ndarray, Y: np.ndarray = None) -> Union[
+            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """calculate inverse of the dimension reduction.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            shape(n, n_comp) scores to inverse transform.
+        Y : np.ndarray, default=None
+            shape(n, n_comp) scores to inverse transform (optional)
+
+        Returns
+        -------
+        x_scores : np.ndarray
+            shape(n, xd) estimate of X-coordinates.
+        y_scores : np.ndarray
+            shape(n, yd) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
+            only returned if Y is not None.
+        """
+        return super().inverse_transform(X, Y)
+
+    def predict(self, X: np.ndarray, copy=True) -> np.ndarray:
         check_is_fitted(self)
-        if (self.pls_components == 0):
-            return super().predict(X)
+        X_new = self.correct(X, copy=copy)
+        return self.pls_.predict(X_new, copy=copy)
 
-        X_new = self.correct(X)
-        return self.pls_.predict(X_new)
-
-    def score(self, X: np.ndarray, y: np.ndarray = None) -> float:
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None) -> float:
         check_is_fitted(self)
-        if (self.pls_components == 0):
-            return super().score(*self.correct(X, y))
-
-        return self.pls_.score(*self.correct(X, y))
-
-    @property
-    def predictive_scores(self) -> np.ndarray:
-        """ Orthogonal loadings. """
-        return self._pls._x_scores
-
-    @property
-    def predictive_loadings(self) -> np.ndarray:
-        """ Predictive loadings. """
-        return self._pls._x_loadings
+        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight)
