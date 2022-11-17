@@ -6,7 +6,7 @@ import pathlib
 from sklearn.model_selection import train_test_split
 from sklearn.cross_decomposition import PLSRegression
 
-from OPLS import PLS, OPLS, OPLS_PLS
+from OPLS import PLS, OPLS, OPLS_PLS, PLS_MD
 
 
 with np.load(pathlib.Path(__file__).parent.parent / "rsc" / "test_data.npz") as npz:
@@ -19,6 +19,20 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.5, random_state=42)
 
 if (True):
+    import MDAnalysis as mda
+    u = mda.Universe(
+        str(pathlib.Path(__file__).parent.parent / "rsc" / "tmd.pdb")
+    )
+    u.load_new(X_train.reshape((X_train.shape[0], u.atoms.n_atoms, 3)))
+
+    pls_md = PLS_MD(n_components=5).fit(u, y_train)
+    pls = PLS(n_components=5).fit(X_train, y_train)
+    u.load_new(X_test.reshape((X_test.shape[0], u.atoms.n_atoms, 3)))
+    assert np.all(np.abs(pls_md.transform(u)-pls.transform(X_test)) < 1e-6)
+    assert np.abs(pls_md.score(u, y_test)-pls.score(X_test, y_test)) < 1e-10
+
+
+if (False):
     fig1, axes1 = plt.subplots(1, 2)
     fig2, axes2 = plt.subplots(1, 2)
 
@@ -58,9 +72,9 @@ if (True):
     fig1.savefig(pathlib.Path(__file__).parent / "center_scale_test1.png")
     fig2.savefig(pathlib.Path(__file__).parent / "center_scale_test2.png")
 
-    quit()
+    # quit()
 
-if (False):
+if (True):
     maxk = 15
 
     ncomp = np.arange(maxk)+1
@@ -86,8 +100,8 @@ if (False):
         for k in ncomp:
             print(i, k, end="\r")
             opls = OPLS(n_components=i).fit(X_train, y_train)
-            pls = PLS(n_components=k).fit(opls.transform(X_train), y_train)
-            opls_pls_score[i].append(pls.score(opls.transform(X_test), y_test))
+            pls = PLS(n_components=k).fit(opls.correct(X_train), y_train)
+            opls_pls_score[i].append(pls.score(opls.correct(X_test), y_test))
 
         print("%2d  " % i, ["%.4f" % v for v in opls_pls_score[i]])
 
@@ -102,17 +116,27 @@ if (False):
     fig.tight_layout()
     fig.savefig(pathlib.Path(__file__).parent / "scores.png")
 
+    fig, ax = plt.subplots(1)
+    ax.plot(ncomp, pls_score, label="PLS")
+    ax.plot(ncomp, opls_score, label="OPLS")
+    for i in opls_pls_score:
+        ax.plot(ncomp+i, opls_pls_score[i], "--", label=f"OPLS({i})-PLS")
+
+    ax.xlim(ncomp.min()-1, ncomp.max()+1)
+    ax.legend()
+    fig.set_size_inches(12, 8)
+    fig.tight_layout()
+    fig.savefig(pathlib.Path(__file__).parent / "scores2.png")
+
 jaas = 10
 print(0, jaas,
-      PLS(n_components=10).fit(X_train, y_train).score(X_test, y_test),
-      OPLS_PLS(0, 10).fit(X_train, y_train).score(X_test, y_test))
+      PLS(n_components=10).fit(X_train, y_train).score(X_test, y_test))
 for i in range(1, jaas):
     k = jaas-i
     opls = OPLS(n_components=i).fit(X_train, y_train)
-    pls = PLS(n_components=k).fit(opls.transform(X_train), y_train)
-    print(i, k, pls.score(opls.transform(X_test), y_test),
+    pls = PLS(n_components=k).fit(opls.correct(X_train), y_train)
+    print(i, k, pls.score(opls.correct(X_test), y_test),
           OPLS_PLS(i, k).fit(X_train, y_train).score(X_test, y_test))
 
 print(10, jaas,
-      OPLS(n_components=10).fit(X_train, y_train).score(X_test, y_test),
-      OPLS_PLS(10, 0).fit(X_train, y_train).score(X_test, y_test))
+      OPLS(n_components=10).fit(X_train, y_train).score(X_test, y_test))
