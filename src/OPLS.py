@@ -79,7 +79,7 @@ def nipals(x: np.ndarray, y: np.ndarray,
         Variable matrix with size n by d, where n number of samples,
         p number of variables.
     y: np.ndarray
-        Dependent variable with size n by t. For now only t==1 is implemented.
+        Dependent variable with size n by t.
     tol: float
         Tolerance for the convergence.
     max_iter: int
@@ -114,8 +114,6 @@ def nipals(x: np.ndarray, y: np.ndarray,
         c = y.T @ t / (t.T @ t)
         u_new = y @ c / (c.T @ c)
         d = la.norm(u_new - u) / la.norm(u_new)
-        # TODO: remove
-        #print(f"Iteration {i}: d={d}")
         u = u_new
         i += 1
 
