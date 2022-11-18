@@ -241,7 +241,7 @@ class PLS(
         P = np.empty((xd, n_comp))  # X-loadings |     Gamma
         Q = np.empty((yd, n_comp))  # Y-loadings |     Delta
 
-        Y_eps = np.finfo(Y.dtype).eps
+        #Y_eps = np.finfo(Y.dtype).eps
 
         for k in range(n_comp):
             # Replace columns that are all close to zero with zeros
@@ -620,7 +620,7 @@ class OPLS(
             self._Cortho = Cortho
             self._Qortho = Qortho
             # orthogonal y rotations
-            self._Sortho = Wortho @ pinv(Portho.T @ Wortho, check_finite=False)
+            self._Sortho = Cortho @ pinv(Qortho.T @ Cortho, check_finite=False)
 
         self._coef_ = self.x_rotations_ @ Q.T
         self._coef_ *= self._y_std
