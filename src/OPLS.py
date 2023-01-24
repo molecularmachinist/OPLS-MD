@@ -1047,6 +1047,9 @@ class OPLS_PLS(OPLS):
         y_scores : np.ndarray
             shape(n, pls_comp) y-scores, only returned if Y is not None.
         """
+        if(Y is None):
+            x_filt = super().correct(X, copy=copy)
+            return self._pls.transform(x_filt, copy=copy)
         x_filt, y_filt = super().correct(X, Y, copy=copy)
         return self._pls.transform(x_filt, y_filt, copy=copy)
 
