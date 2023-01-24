@@ -171,7 +171,7 @@ class PLS(
         return f"{type(self).__name__}(n_components={self.n_components})"
 
     def __repr__(self):
-        return f"{type(self).__name__}(n_components={self.n_components}, deflation_mode={self.deflation_mode})"
+        return f"{type(self).__name__}(n_components={self.n_components}, deflation_mode={repr(self.deflation_mode)})"
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "PLS":
         """
@@ -429,7 +429,7 @@ class OPLS(
         return f"{type(self).__name__}(n_components={self.n_components})"
 
     def __repr__(self):
-        return f"{type(self).__name__}(n_components={self.n_components}, algorithm={self.algorithm}, deflation_mode={self.deflation_mode})"
+        return f"{type(self).__name__}(n_components={self.n_components}, algorithm={repr(self.algorithm)}, deflation_mode={repr(self.deflation_mode)})"
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS":
         """
@@ -959,10 +959,10 @@ class OPLS_PLS(OPLS):
         self.pls_components = pls_components
 
     def __str__(self):
-        return f"{type(self).__name__}(n_components={self.n_components})"
+        return f"{type(self).__name__}(n_components={self.n_components}, pls_components={self.pls_components})"
 
     def __repr__(self):
-        return f"{type(self).__name__}(n_components={self.n_components}, pls_components={self.pls_components}, algorithm={self.algorithm}, deflation_mode={self.deflation_mode})"
+        return f"{type(self).__name__}(n_components={self.n_components}, pls_components={self.pls_components}, algorithm={repr(self.algorithm)}, deflation_mode={repr(self.deflation_mode)})"
 
     def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS_PLS":
         """
@@ -1047,7 +1047,7 @@ class OPLS_PLS(OPLS):
         y_scores : np.ndarray
             shape(n, pls_comp) y-scores, only returned if Y is not None.
         """
-        if(Y is None):
+        if (Y is None):
             x_filt = super().correct(X, copy=copy)
             return self._pls.transform(x_filt, copy=copy)
         x_filt, y_filt = super().correct(X, Y, copy=copy)
