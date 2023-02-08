@@ -88,14 +88,16 @@ class _MD_PLS_WRAPPER():
 
     def inverse_predict(self,
                         Y: np.ndarray,
+                        ndim: int = None,
                         copy=True):
-        return self._to_crd(super().inverse_predict(Y, copy))
+        return self._to_crd(super().inverse_predict(Y, ndim, copy))
 
     def predict(self,
                 crd: Union[np.ndarray, Universe, AtomGroup],
+                ndim: int = None,
                 copy=True):
         X = self._from_crd(crd)
-        return super().predict(X, copy)
+        return super().predict(X, ndim, copy)
 
 
 class _MD_OPLS_WRAPPER(_MD_PLS_WRAPPER):

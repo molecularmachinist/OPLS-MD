@@ -5,6 +5,7 @@ from typing import Union, Tuple
 import numpy as np
 from numpy import linalg as la
 from scipy.linalg import pinv
+from sklearn.metrics import r2_score
 from sklearn.cross_decomposition._pls import (_PLS, _svd_flip_1d)
 from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES
@@ -241,6 +242,8 @@ class PLS(
         P = np.empty((xd, n_comp))  # X-loadings |     Gamma
         Q = np.empty((yd, n_comp))  # Y-loadings |     Delta
 
+        all_coefs = np.empty((n_comp, yd, xd))
+
         #Y_eps = np.finfo(Y.dtype).eps
 
         for k in range(n_comp):
@@ -282,6 +285,13 @@ class PLS(
             P[:, k] = p.squeeze(axis=1)
             Q[:, k] = q.squeeze(axis=1)
 
+            _x_rot = W[:,:k+1] @ pinv(P[:,:k+1].T @ W[:,:k+1], check_finite=False)
+            _y_rot = C[:,:k+1] @ pinv(Q[:,:k+1].T @ C[:,:k+1], check_finite=False)
+            coef = _x_rot @ Q[:,:k+1].T
+            coef *= self._y_std
+            
+            all_coefs[k] = coef.T
+
         self._x_weights = W
         self._y_weights = C
         self._x_scores = T
@@ -296,6 +306,8 @@ class PLS(
         self._coef_ *= self._y_std
         self._coef_ = self._coef_.T
 
+        self._all_coefs = all_coefs
+
         #self.coef_ = self._coef_
 
         # "expose" all the weights, scores and loadings
@@ -308,7 +320,47 @@ class PLS(
 
         return self
 
-    def inverse_predict(self, Y, copy=True):
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim: int = None) -> float:
+        y_pred = self.predict(X, ndim=ndim)
+        return r2_score(y, y_pred, sample_weight=sample_weight)
+
+    def predict(self, X: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
+        """Predict targets of given samples.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Samples.
+        ndim : int|None, default None
+            Number of PLS dimension to use for the prediction. None uses all
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+        Returns
+        -------
+        y_pred : ndarray of shape (n_samples,) or (n_samples, n_targets)
+            Returns predicted values.
+        Notes
+        -----
+        This call requires the estimation of a matrix of shape
+        `(n_features, n_targets)`, which may be an issue in high dimensional
+        space.
+        """
+        if(ndim is None):
+            return super().predict(X,copy=copy)
+        
+        check_is_fitted(self)
+
+        if(ndim>self.n_components):
+            raise ValueError(f"ndim is bigger than the number of components this object was trained with")
+
+        X = self._validate_data(X, copy=copy, dtype=FLOAT_DTYPES, reset=False)
+        # Normalize
+        X -= self._x_mean
+        X /= self._x_std
+        
+        Ypred = X @ self._all_coefs[ndim-1].T
+        return Ypred + self.intercept_
+
+    def inverse_predict(self, Y: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
         """Predict samples of given targets.
         With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
         along the given y-coordinates. For example:
@@ -336,6 +388,13 @@ class PLS(
 
         """
         check_is_fitted(self)
+
+        if(ndim is None):
+            ndim = self.n_components
+
+        if(ndim>self.n_components):
+            raise ValueError(f"ndim is bigger than the number of components this object was trained with")
+
         Y = check_array(
             Y, input_name="Y", ensure_2d=False, copy=copy, dtype=FLOAT_DTYPES
         )
@@ -344,10 +403,10 @@ class PLS(
 
         if Y.ndim == 1:
             # This is technically equal to the below with univariate y, but doesn't require the pseudo inversing
-            scaledcoef = self._coef_ / (self._coef_**2).sum()
+            scaledcoef = self._all_coefs[ndim-1] / (self._all_coefs[ndim-1]**2).sum()
             X_pred = Y[:, np.newaxis] * scaledcoef
         else:
-            invcoef = pinv(self._coef_).T
+            invcoef = pinv(self._all_coefs[ndim-1]).T
             X_pred = Y @ invcoef
 
         X_pred *= self._x_std
@@ -638,7 +697,14 @@ class OPLS(
 
         return self
 
-    def inverse_predict(self, Y, copy=True):
+    def predict(self, X: np.ndarray, ndim=None, copy=True) -> np.ndarray:
+        return super().predict(X, copy=copy)
+
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim=None) -> float:
+        check_is_fitted(self)
+        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight)
+
+    def inverse_predict(self, Y, ndim=None, copy=True):
         """Predict samples of given targets.
         With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
         along the given y-coordinates. For example:
@@ -654,6 +720,9 @@ class OPLS(
             Array of shape(n_samples) or shape(n_samples, yd) targets. In the first case this is done as
             linear interpolatio along the coefficient vector. In the latter the pseudo inverse of the coeficient matrix is calculated.
             When yd=1 these two methods are equal (up to machine precision).
+
+        ndim : None
+            ignored
 
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
@@ -1117,15 +1186,15 @@ class OPLS_PLS(OPLS):
         """
         return super().inverse_transform(X, Y)
 
-    def predict(self, X: np.ndarray, copy=True) -> np.ndarray:
+    def predict(self, X: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
         check_is_fitted(self)
         X_new = self.correct(X, copy=copy)
-        return self.pls_.predict(X_new, copy=copy)
+        return self.pls_.predict(X_new, ndim, copy=copy)
 
-    def inverse_predict(self, X: np.ndarray, copy=True) -> np.ndarray:
+    def inverse_predict(self, Y: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
         check_is_fitted(self)
-        return self.pls_.inverse_predict(X, copy=copy)
+        return self.pls_.inverse_predict(Y, ndim, copy=copy)
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None) -> float:
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim: int = None) -> float:
         check_is_fitted(self)
-        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight)
+        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight, ndim=None)
