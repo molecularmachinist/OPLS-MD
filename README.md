@@ -7,6 +7,12 @@ OPLS and PLS regressors
 Run
 
 ```
+pip install OPLS-MD
+```
+
+or to get the latest development commits clone the github repo and run
+
+```
 pip install .
 ```
 
