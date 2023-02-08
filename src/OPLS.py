@@ -1122,6 +1122,10 @@ class OPLS_PLS(OPLS):
         X_new = self.correct(X, copy=copy)
         return self.pls_.predict(X_new, copy=copy)
 
+    def inverse_predict(self, X: np.ndarray, copy=True) -> np.ndarray:
+        check_is_fitted(self)
+        return self.pls_.inverse_predict(X, copy=copy)
+
     def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None) -> float:
         check_is_fitted(self)
         return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight)
