@@ -32,7 +32,7 @@ if (True):
     assert np.abs(pls_md.score(u, y_test)-pls.score(X_test, y_test)) < 1e-10
 
 
-if (False):
+if (True):
     fig1, axes1 = plt.subplots(1, 2)
     fig2, axes2 = plt.subplots(1, 2)
 
@@ -85,6 +85,16 @@ if (True):
         pls_score.append(pls.score(X_test, y_test))
 
     print("pls ", ["%.4f" % v for v in pls_score])
+    
+    ncomp = np.arange(maxk)+1
+    pls_score = []
+    pls = PLS(n_components=maxk).fit(X_train, y_train)
+    for k in ncomp:
+        print(k, end="\r")
+        pls_score.append(pls.score(X_test, y_test, ndim=k))
+
+    print("pls ", ["%.4f" % v for v in pls_score])
+
     opls_score = []
     for k in ncomp:
         print(k, end="\r")
@@ -97,11 +107,11 @@ if (True):
     ncomp_opls = np.arange(1, 7)
     for i in ncomp_opls:
         opls_pls_score[i] = []
+        opls = OPLS(n_components=i).fit(X_train, y_train)
+        pls = PLS(n_components=maxk).fit(opls.correct(X_train), y_train)
         for k in ncomp:
             print(i, k, end="\r")
-            opls = OPLS(n_components=i).fit(X_train, y_train)
-            pls = PLS(n_components=k).fit(opls.correct(X_train), y_train)
-            opls_pls_score[i].append(pls.score(opls.correct(X_test), y_test))
+            opls_pls_score[i].append(pls.score(opls.correct(X_test), y_test, ndim=k))
 
         print("%2d  " % i, ["%.4f" % v for v in opls_pls_score[i]])
 
@@ -122,7 +132,7 @@ if (True):
     for i in opls_pls_score:
         ax.plot(ncomp+i, opls_pls_score[i], "--", label=f"OPLS({i})-PLS")
 
-    ax.xlim(ncomp.min()-1, ncomp.max()+1)
+    ax.set_xlim(ncomp.min()-1, ncomp.max()+1)
     ax.legend()
     fig.set_size_inches(12, 8)
     fig.tight_layout()
