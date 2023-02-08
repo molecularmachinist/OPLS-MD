@@ -9,7 +9,9 @@ except ImportError as e:
     Universe = None
     AtomGroup = None
 
-from .OPLS import PLS, OPLS, OPLS_PLS
+from .OPLS import OPLS
+from .PLS import PLS
+from .OPLS_PLS import OPLS_PLS
 
 from typing import Union, Tuple
 
