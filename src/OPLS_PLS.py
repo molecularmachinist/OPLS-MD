@@ -241,4 +241,4 @@ class OPLS_PLS(OPLS):
 
     def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim: int = None) -> float:
         check_is_fitted(self)
-        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight, ndim=None)
+        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight, ndim=ndim)
