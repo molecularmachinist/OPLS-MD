@@ -1,4 +1,4 @@
-__version__ = "0.0.2-dev"
+__version__ = "0.0.2"
 
 from .OPLS import OPLS
 from .PLS import PLS
