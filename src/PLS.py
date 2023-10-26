@@ -197,7 +197,7 @@ class PLS(
 
         self._all_coefs = all_coefs
 
-        # self.coef_ = self._coef_
+        self.coef_ = self._coef_
 
         # "expose" all the weights, scores and loadings
         self.x_weights_ = self._x_weights
