@@ -1,5 +1,8 @@
-v0.0.3
+v0.0.4:
     - bugfix: predict did not work with newest sklearn without the ndim parameter. Now should work.
+
+v0.0.3:
+    - skipped
 
 v0.0.2:
     - PLS calculates coefficients for all number of components. An additional parameter "ncomp"
