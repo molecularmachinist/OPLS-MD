@@ -234,7 +234,7 @@ class PLS(
         space.
         """
         if (ndim is None):
-            return super().predict(X, copy=copy)
+            ndim = self.n_components
 
         check_is_fitted(self)
 
