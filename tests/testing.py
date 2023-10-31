@@ -138,6 +138,3 @@ for i in range(1, jaas):
     pls = PLS(n_components=k).fit(opls.correct(X_train), y_train)
     print(i, k, pls.score(opls.correct(X_test), y_test),
           OPLS_PLS(i, k).fit(X_train, y_train).score(X_test, y_test))
-
-print(10, jaas,
-      OPLS(n_components=10).fit(X_train, y_train).score(X_test, y_test))
