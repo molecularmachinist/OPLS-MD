@@ -95,14 +95,6 @@ if (True):
 
     print("pls ", ["%.4f" % v for v in pls_score])
 
-    opls_score = []
-    for k in ncomp:
-        print(k, end="\r")
-        pls = OPLS(n_components=k).fit(X_train, y_train)
-        opls_score.append(pls.score(X_test, y_test))
-
-    print("opls", ["%.4f" % v for v in opls_score])
-
     opls_pls_score = {}
     ncomp_opls = np.arange(1, 7)
     for i in ncomp_opls:
@@ -118,7 +110,6 @@ if (True):
 
     fig, ax = plt.subplots(1)
     ax.plot(ncomp, pls_score, label="PLS")
-    ax.plot(ncomp, opls_score, label="OPLS")
     for i in opls_pls_score:
         ax.plot(ncomp, opls_pls_score[i], "--", label=f"OPLS({i})-PLS")
 
@@ -129,7 +120,6 @@ if (True):
 
     fig, ax = plt.subplots(1)
     ax.plot(ncomp, pls_score, label="PLS")
-    ax.plot(ncomp, opls_score, label="OPLS")
     for i in opls_pls_score:
         ax.plot(ncomp+i, opls_pls_score[i], "--", label=f"OPLS({i})-PLS")
 
