@@ -1,3 +1,7 @@
+v0.0.5:
+    - bugfix: Basically the same bug as for v0.0.4, different reason. Now no longer uses the predict from skearn even if ndim=None.
+    - OPLS object no longer allows predictions
+
 v0.0.4:
     - bugfix: predict did not work with newest sklearn without the ndim parameter. Now should work.
 

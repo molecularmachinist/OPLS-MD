@@ -10,7 +10,7 @@ Run
 pip install OPLS-MD
 ```
 
-or to get the latest development commits clone the github repo and run
+or to get the latest development commits (if any) clone the github repo and run
 
 ```
 pip install .
@@ -138,7 +138,7 @@ for k in range(1,maxcomp+1):
 
 ```
 
-The same works with `PLS_MD` and `OPLS_PLS` (and of course `OPLS_PLS_MD`). With the latter it of course only affects the underlying PLS model.
+The same works with `PLS_MD` and `OPLS_PLS_MD`. With the latter it only affects the underlying PLS model, not the OPLS filter.
 
 
 ## References
