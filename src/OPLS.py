@@ -279,12 +279,6 @@ class OPLS(
             # orthogonal y rotations
             self._Sortho = Cortho @ pinv(Qortho.T @ Cortho, check_finite=False)
 
-        self._coef_ = self.x_rotations_ @ Q.T
-        self._coef_ *= self._y_std
-        self._coef_ = self._coef_.T
-
-        # self.coef_ = self._coef_
-
         # "expose" all the weights, scores and loadings
         self.x_weights_ = self._x_weights
         self.y_weights_ = self._y_weights
@@ -296,60 +290,13 @@ class OPLS(
         return self
 
     def predict(self, X: np.ndarray, ndim=None, copy=True) -> np.ndarray:
-        return super().predict(X, copy=copy)
+        raise NotImplementedError("predict not available with OPLS")
 
     def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim=None) -> float:
-        check_is_fitted(self)
-        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight)
+        raise NotImplementedError("score not available with OPLS")
 
     def inverse_predict(self, Y, ndim=None, copy=True):
-        """Predict samples of given targets.
-        With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
-        along the given y-coordinates. For example:
-
-        >>> x_interp = pls.inverse_predict(np.linspace(y.min(), y.max(), 101))
-
-        With multivariate y this can still be used to generate interpolated structures, but it becomes a more complex combination of the coefficient vectors.
-        In such a case it might be more meaningful to manually interpolate along each of the n_components coefficient vector individually. 
-
-        Parameters
-        ----------
-        Y : np.ndarray
-            Array of shape(n_samples) or shape(n_samples, yd) targets. In the first case this is done as
-            linear interpolatio along the coefficient vector. In the latter the pseudo inverse of the coeficient matrix is calculated.
-            When yd=1 these two methods are equal (up to machine precision).
-
-        ndim : None
-            ignored
-
-        copy : bool, default=True
-            Whether to copy `X` and `Y`, or perform in-place normalization.
-
-        Returns
-        -------
-        X_pred : np.ndarray
-            shape (n_samples,) or (n_samples, n_targets)
-            Returns predicted values.
-
-        """
-        check_is_fitted(self)
-        Y = check_array(
-            Y, input_name="Y", ensure_2d=False, copy=copy, dtype=FLOAT_DTYPES
-        )
-        # Center the Y values. _coef_ already has
-        Y -= self.intercept_
-
-        if Y.ndim == 1:
-            # This is technically equal to the below with univariate y, but doesn't require the pseudo inversing
-            scaledcoef = self._coef_ / (self._coef_**2).sum()
-            X_pred = Y[:, np.newaxis] * scaledcoef
-        else:
-            invcoef = pinv(self._coef_).T
-            X_pred = Y @ invcoef
-
-        X_pred *= self._x_std
-        X_pred += self._x_mean
-        return X_pred
+        raise NotImplementedError("inverse_predict not available with OPLS")
 
     def transform(self, X: np.ndarray, Y: np.ndarray = None, copy=True):
         """Apply the dimension reduction to get the orthogonal scores.
@@ -531,9 +478,6 @@ class OPLS(
                 return x_new, x_ortho, y_new.squeeze(axis=1), y_ortho.squeeze(axis=1)
             return x_new, x_ortho, y_new, y_ortho
         return x_new, x_ortho
-
-    def score(self, X, y=None):
-        return super().score(*self.correct(X, y))
 
     @property
     def predictive_scores(self) -> np.ndarray:
