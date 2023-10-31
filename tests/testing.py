@@ -6,7 +6,7 @@ import pathlib
 from sklearn.model_selection import train_test_split
 from sklearn.cross_decomposition import PLSRegression
 
-from OPLS import PLS, OPLS, OPLS_PLS, PLS_MD
+from OPLS_MD import PLS, OPLS, OPLS_PLS, PLS_MD
 
 
 with np.load(pathlib.Path(__file__).parent.parent / "rsc" / "test_data.npz") as npz:
@@ -85,7 +85,7 @@ if (True):
         pls_score.append(pls.score(X_test, y_test))
 
     print("pls ", ["%.4f" % v for v in pls_score])
-    
+
     ncomp = np.arange(maxk)+1
     pls_score = []
     pls = PLS(n_components=maxk).fit(X_train, y_train)
@@ -111,7 +111,8 @@ if (True):
         pls = PLS(n_components=maxk).fit(opls.correct(X_train), y_train)
         for k in ncomp:
             print(i, k, end="\r")
-            opls_pls_score[i].append(pls.score(opls.correct(X_test), y_test, ndim=k))
+            opls_pls_score[i].append(
+                pls.score(opls.correct(X_test), y_test, ndim=k))
 
         print("%2d  " % i, ["%.4f" % v for v in opls_pls_score[i]])
 
