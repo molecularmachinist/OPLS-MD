@@ -159,7 +159,7 @@ class PLS(
                 # deflate y
                 Y -= u @ q.T
             elif (self.deflation_mode == "regression"):
-                # In regression mode only x score (u) is used
+                # In regression mode only x score (t) is used
                 # Regress q to minimize error in Yhat = t q^T
                 q = (Y.T @ t) / (t.T @ t)
                 # deflate y
