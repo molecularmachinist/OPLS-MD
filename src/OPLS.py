@@ -203,42 +203,31 @@ class OPLS(
             # orthogonal deflation of X
             X -= t_ortho @ p_ortho.T
 
+            if (self.deflation_mode == "canonical"):
+                # Regress q to minimize error in Yhat = u q^T
+                q = (Y.T @ u) / (u.T @ u)
+            elif (self.deflation_mode == "regression"):
+                # In regression mode only x score (t) is used
+                # Regress q to minimize error in Yhat = t q^T
+                q = (Y.T @ t) / (t.T @ t)
+
+            # In O2PLS we also calculate y-loadings and deflate y
             if (self.algorithm == "O2PLS"):
-                # In O2PLS we also calculate y-loadings and deflate y
+                # find orthogonal y-weights
+                c_ortho = q-((c.T @ q) / (c.T @ c))*c
+                c_ortho /= la.norm(c_ortho)
+
+                # with the orthogonal weights, calculate orthogonal scores and loadings
+                u_ortho = (Y @ c_ortho) / (c_ortho.T @ c_ortho)
                 if (self.deflation_mode == "canonical"):
-                    # Regress q to minimize error in Yhat = u q^T
-                    q = (Y.T @ u) / (u.T @ u)
-                    # find orthogonal weights
-                    c_ortho = q-((c.T @ q) / (c.T @ c))*c
-                    c_ortho /= la.norm(c_ortho)
-
-                    # with the orthogonal weights, calculate orthogonal scores and loadings
-                    u_ortho = (Y @ c_ortho) / (c_ortho.T @ c_ortho)
                     q_ortho = (Y.T @ u_ortho) / (u_ortho.T @ u_ortho)
-
                     # deflate y
                     Y -= u_ortho @ q_ortho.T
                 elif (self.deflation_mode == "regression"):
-                    # In regression mode only x score (u) is used
-                    # Regress q to minimize error in Yhat = t q^T
-                    q = (Y.T @ t) / (t.T @ t)
-                    # find orthogonal weights
-                    c_ortho = q-((c.T @ q) / (c.T @ c))*c
-                    c_ortho /= la.norm(c_ortho)
-
-                    # with the orthogonal weights, calculate orthogonal scores and loadings
-                    u_ortho = (Y @ c_ortho) / (c_ortho.T @ c_ortho)
+                    # In regression mode only x score (t_ortho) is used
                     q_ortho = (Y.T @ t_ortho) / (t_ortho.T @ t_ortho)
                     # deflate y
                     Y -= t_ortho @ q_ortho.T
-            elif (self.algorithm == "OPLS"):
-                if (self.deflation_mode == "canonical"):
-                    # Regress q to minimize error in Yhat = u q^T
-                    q = (Y.T @ u) / (u.T @ u)
-                elif (self.deflation_mode == "regression"):
-                    # In regression mode only x score (u) is used
-                    # Regress q to minimize error in Yhat = t q^T
-                    q = (Y.T @ t) / (t.T @ t)
 
             W[:, k] = w.squeeze(axis=1)
             U[:, k] = u.squeeze(axis=1)
