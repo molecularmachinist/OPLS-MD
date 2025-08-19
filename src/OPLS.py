@@ -4,12 +4,9 @@ from typing import Union, Tuple
 import numpy as np
 from numpy import linalg as la
 from scipy.linalg import pinv
-from sklearn.cross_decomposition._pls import (_PLS, _svd_flip_1d)
-from sklearn.utils import check_array, check_consistent_length
-from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES
 
-
-from .utils import center_scale_data, nipals
+from .base_PLS import _PLS
+from .utils import center_scale_data, nipals, flip_scores_by_absolute_value
 
 
 class OPLS(
@@ -36,6 +33,8 @@ class OPLS(
     copy : bool, default=True
         Whether to make copies of X and Y. False does not guarantee everything is in place, but
         True does guarantee copying.
+    dtype : numpy.dtype, default=float64
+        numpy dtype to cast input to. If None calculations will be done with whatever dtype the input arrays have.
     algorithm : str, default="OPLS"
         The algorithm to use. Acceptable values are "OPLS" and "O2PLS".
         NOTE: "O2PLS" is not yet well tested, and OPLS is only tested with univariate y.
@@ -61,7 +60,16 @@ class OPLS(
     """
 
     def __init__(
-        self, n_components=1, *, scale=True, center=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None,
+        self, n_components=1, *,
+        scale=True,
+        center=True,
+        flip=False,
+        max_iter=500,
+        tol=1e-06,
+        copy=True,
+        dtype=np.float64,
+        algorithm="OPLS",
+        deflation_mode=None,
     ):
         if (deflation_mode is None):
             if (algorithm == "OPLS"):
@@ -72,15 +80,15 @@ class OPLS(
         super().__init__(
             n_components=n_components,
             scale=scale,
-            deflation_mode=deflation_mode,
-            mode="A",
-            algorithm=algorithm,
+            center=center,
+            flip=flip,
             max_iter=max_iter,
             tol=tol,
             copy=copy,
+            dtype=dtype,
+            deflation_mode=deflation_mode
         )
-        self.flip = flip
-        self.center = center
+        self.algorithm = algorithm
 
     def __str__(self):
         return f"{type(self).__name__}(n_components={self.n_components})"
@@ -116,13 +124,7 @@ class OPLS(
             J Chemometrics. 2003, 17, 53-64.
         [3] https://scikit-learn.org/stable/modules/cross_decomposition.html#cross-decomposition
         """
-        check_consistent_length(x, y)
-        X = self._validate_data(
-            x, dtype=np.float64, copy=self.copy, ensure_min_samples=2
-        )
-        Y = check_array(
-            y, input_name="Y", dtype=np.float64, copy=self.copy, ensure_2d=False
-        )
+        X, Y = self.validate_input(x, y)
         if (Y.ndim == 1):
             Y = Y[:, np.newaxis]
 
@@ -184,7 +186,7 @@ class OPLS(
 
             if (self.flip):
                 # Flip for consistency across solvers
-                _svd_flip_1d(w, c)
+                flip_scores_by_absolute_value(w, c)
                 # recalculate scores after flip
                 t = X @ w
                 u = Y @ c / (c.T @ c)
@@ -276,6 +278,7 @@ class OPLS(
         self.x_loadings_ = self._x_loadings
         self.y_loadings_ = self._y_loadings
 
+        self.fitted = True
         return self
 
     def predict(self, X: np.ndarray, ndim=None, copy=True) -> np.ndarray:
@@ -307,8 +310,8 @@ class OPLS(
             shape(n, n_comp) orthogonal y-scores OR unchanged Y if algorithm=="OPLS"
             only returned if Y is not None.
         """
-        check_is_fitted(self)
-        X = self._validate_data(X, copy=copy, dtype=FLOAT_DTYPES, reset=False)
+        self.check_is_fitted()
+        X = self._validate_array(X, variable_name="Y")
         # Normalize
         X -= self._x_mean
         X /= self._x_std
@@ -317,8 +320,8 @@ class OPLS(
         if Y is not None:
             if (self.algorithm == "OPLS"):
                 return x_scores, Y
-            Y = check_array(
-                Y, input_name="Y", ensure_2d=False, copy=copy, dtype=FLOAT_DTYPES
+            Y = self._validate_array(
+                Y, variable_name="Y", ensure_2d=False, copy=copy
             )
             if Y.ndim == 1:
                 Y = Y[:, np.newaxis]
@@ -347,8 +350,8 @@ class OPLS(
             shape(n, yd) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
             only returned if Y is not None.
         """
-        check_is_fitted(self)
-        X = check_array(X, input_name="X", dtype=FLOAT_DTYPES)
+        self.check_is_fitted()
+        X = self._validate_array(X, variable_name="X")
         # calculate scores
         x_new = X @ self._Portho.T
         x_new *= self._x_std
@@ -357,7 +360,7 @@ class OPLS(
         if Y is not None:
             if (self.algorithm == "OPLS"):
                 return x_new, Y
-            Y = check_array(Y, input_name="Y", dtype=FLOAT_DTYPES)
+            Y = self._validate_array(Y, variable_name="Y")
             y_new = Y @ self._Qortho.T
             y_new *= self._y_std
             y_new += self._y_mean
@@ -395,9 +398,11 @@ class OPLS(
         y_ortho: np.ndarray
             Orthogonal score, shape(n, t). Returned if y is not None and return _ortho=True.
         """
-        check_is_fitted(self)
-        x_new = self._validate_data(
-            X, copy=copy, dtype=FLOAT_DTYPES, reset=False)
+        self.check_is_fitted()
+        if (not y is None):
+            x_new, y_new = self.validate_input(X, y, copy=copy)
+        else:
+            x_new = self._validate_array(X, variable_name="X", copy=copy)
         x_new -= self._x_mean
         x_new /= self._x_std
         n, xd = x_new.shape
@@ -408,16 +413,12 @@ class OPLS(
                              f" but X is shape{X.shape}")
 
         if (not y is None):
-            check_consistent_length(X, y)
-            y_new = Y = check_array(
-                y, input_name="Y", dtype=FLOAT_DTYPES, copy=copy, ensure_2d=False
-            )
             if (len(y_new.shape) == 1):
                 y_new = y_new[:, np.newaxis]
             if (y_new.shape[1] != self._y_loadings.shape[0]):
                 raise ValueError("Dimension mismatch in y, "
-                                 f"the model has been trained with nf={self._x_loadings.shape[0]},"
-                                 f" but y is shape{X.shape}")
+                                 f"the model has been trained with nf={self._y_loadings.shape[0]},"
+                                 f" but y is shape{y.shape}")
 
         correct_y = (not y is None) and self.algorithm == "O2PLS"
 

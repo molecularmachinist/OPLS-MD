@@ -70,7 +70,7 @@ class _MD_PLS_WRAPPER():
     def _to_crd(self, X: np.ndarray) -> np.ndarray:
         return X.reshape(X.shape[0], self.natoms, self.ndim)
 
-    def fit(self, crd: Union[np.ndarray, Universe, AtomGroup], y):
+    def fit(self, crd: Union[np.ndarray, Universe, AtomGroup], y: np.ndarray):
         self._get_dims(crd)
         return super().fit(self._from_crd(crd), y)
 
@@ -79,7 +79,7 @@ class _MD_PLS_WRAPPER():
                   Y=None,
                   copy=True):
         X = self._from_crd(crd)
-        return super().transform(X, Y, copy)
+        return super().transform(X, Y, copy=copy)
 
     def inverse_transform(self, X: np.ndarray, Y: np.ndarray = None):
         if Y is None:
@@ -92,14 +92,23 @@ class _MD_PLS_WRAPPER():
                         Y: np.ndarray,
                         ndim: int = None,
                         copy=True):
-        return self._to_crd(super().inverse_predict(Y, ndim, copy))
+        return self._to_crd(super().inverse_predict(Y, ndim, copy=copy))
 
     def predict(self,
                 crd: Union[np.ndarray, Universe, AtomGroup],
                 ndim: int = None,
                 copy=True):
         X = self._from_crd(crd)
-        return super().predict(X, ndim, copy)
+        return super().predict(X, ndim=ndim, copy=copy)
+
+    def score(self,
+              crd: Union[np.ndarray, Universe, AtomGroup],
+              y: np.ndarray,
+              ndim: int = None,
+              sample_weight: np.ndarray = None,
+              copy=True):
+        X = self._from_crd(crd)
+        return super().score(X, y, ndim=ndim, sample_weight=sample_weight, copy=copy)
 
 
 class _MD_OPLS_WRAPPER(_MD_PLS_WRAPPER):
@@ -148,6 +157,8 @@ class PLS_MD(_MD_PLS_WRAPPER, PLS):
     copy : bool, default=True
         Whether to make copies of X and Y. False does not guarantee calculations are in place, but
         True does guarantee copying.
+    dtype : numpy.dtype, default=float64
+        numpy dtype to cast input to. If None calculations will be done with whatever dtype the input arrays have.
     deflation_mode : str, default=None
         Whether to calculate y deflation with x_scores ("regression") or y_scores ("canonical").
         The latter only is reliable with n_components<=Y.shape[1]. The first will make this the same as

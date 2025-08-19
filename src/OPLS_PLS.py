@@ -1,7 +1,6 @@
 from typing import Union, Tuple
 
 import numpy as np
-from sklearn.utils.validation import check_is_fitted
 
 from .PLS import PLS
 from .OPLS import OPLS
@@ -31,6 +30,8 @@ class OPLS_PLS(OPLS):
     copy : bool, default=True
         Whether to make copies of X and Y. False does not guarantee everything is in place, but
         True does guarantee copying.
+    dtype : numpy.dtype, default=float64
+        numpy dtype to cast input to. If None calculations will be done with whatever dtype the input arrays have.
     algorithm : str, default="OPLS"
         The algorithm to use. Acceptable values are "OPLS" and "O2PLS".
         NOTE: "O2PLS" is not yet well tested, and OPLS is only tested with univariate y.
@@ -56,7 +57,16 @@ class OPLS_PLS(OPLS):
         The wrapped PLS model
     """
 
-    def __init__(self, n_components=1, pls_components=2, *, scale=True, center=True, flip=False, max_iter=500, tol=1e-06, copy=True, algorithm="OPLS", deflation_mode=None):
+    def __init__(self, n_components=1, pls_components=2, *,
+                 scale=True,
+                 center=True,
+                 flip=False,
+                 max_iter=500,
+                 tol=1e-06,
+                 copy=True,
+                 dtype=np.float64,
+                 algorithm="OPLS",
+                 deflation_mode=None):
 
         super().__init__(
             n_components=n_components,
@@ -67,6 +77,7 @@ class OPLS_PLS(OPLS):
             max_iter=max_iter,
             tol=tol,
             copy=copy,
+            dtype=dtype,
             flip=flip
         )
         self.pls_components = pls_components
@@ -231,14 +242,14 @@ class OPLS_PLS(OPLS):
         return super().inverse_transform(X, Y)
 
     def predict(self, X: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
-        check_is_fitted(self)
+        self.check_is_fitted()
         X_new = self.correct(X, copy=copy)
         return self.pls_.predict(X_new, ndim, copy=copy)
 
     def inverse_predict(self, Y: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
-        check_is_fitted(self)
+        self.check_is_fitted()
         return self.pls_.inverse_predict(Y, ndim, copy=copy)
 
     def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim: int = None) -> float:
-        check_is_fitted(self)
+        self.check_is_fitted()
         return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight, ndim=ndim)

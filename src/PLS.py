@@ -1,11 +1,8 @@
 import numpy as np
 from scipy.linalg import pinv
-from sklearn.metrics import r2_score
-from sklearn.cross_decomposition._pls import (_PLS, _svd_flip_1d)
-from sklearn.utils import check_array, check_consistent_length
-from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES
 
-from .utils import center_scale_data, nipals
+from .base_PLS import _PLS
+from .utils import center_scale_data, nipals, r2_score, flip_scores_by_absolute_value
 
 
 class PLS(
@@ -31,6 +28,8 @@ class PLS(
     copy : bool, default=True
         Whether to make copies of X and Y. False does not guarantee calculations are in place, but
         True does guarantee copying.
+    dtype : numpy.dtype, default=float64
+        numpy dtype to cast input to. If None calculations will be done with whatever dtype the input arrays have.
     deflation_mode : str, default=None
         Whether to calculate y deflation with x_scores ("regression") or y_scores ("canonical").
         The latter only is reliable with n_components<=Y.shape[1]. The first will make this the same as
@@ -38,22 +37,6 @@ class PLS(
         sklearn.cross_decomposition.PLSCanonical.
         In either case the first PLS component is the same.
     """
-
-    def __init__(
-        self, n_components=2, *, scale=True, center=True, flip=False, max_iter=500, tol=1e-06, copy=True, deflation_mode="regression",
-    ):
-        super().__init__(
-            n_components=n_components,
-            scale=scale,
-            deflation_mode=deflation_mode,
-            mode="A",
-            algorithm="mynipals",
-            max_iter=max_iter,
-            tol=tol,
-            copy=copy,
-        )
-        self.flip = flip
-        self.center = center
 
     def __str__(self):
         return f"{type(self).__name__}(n_components={self.n_components})"
@@ -86,13 +69,7 @@ class PLS(
             J Chemometrics. 2003, 17, 53-64.
         [3] https://scikit-learn.org/stable/modules/cross_decomposition.html#cross-decomposition
         """
-        check_consistent_length(x, y)
-        X = self._validate_data(
-            x, dtype=np.float64, copy=self.copy, ensure_min_samples=2
-        )
-        Y = check_array(
-            y, input_name="Y", dtype=np.float64, copy=self.copy, ensure_2d=False
-        )
+        X, Y = self.validate_input(x, y)
         if (Y.ndim == 1):
             Y = Y[:, np.newaxis]
 
@@ -143,7 +120,7 @@ class PLS(
 
             if (self.flip):
                 # Flip for consistency across solvers
-                _svd_flip_1d(w, c)
+                flip_scores_by_absolute_value(w, c)
                 # recalculate scores after flip
                 t = X @ w
                 u = Y @ c / (c.T @ c)
@@ -207,13 +184,134 @@ class PLS(
         self.x_loadings_ = self._x_loadings
         self.y_loadings_ = self._y_loadings
 
+        self.fitted = True
         return self
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim: int = None) -> float:
-        y_pred = self.predict(X, ndim=ndim)
-        return r2_score(y, y_pred, sample_weight=sample_weight)
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, *, ndim: int = None, copy=True) -> float:
+        """Predict targets of given samples.
+        Parameters
+        ----------
+        X : array-like of shape(n_samples, n_features)
+            Samples.
+        y : array-like of shape shape (n_samples) or (n_samples, yd)
+            True y-values
+        ndim : int|None, default None
+            Number of PLS dimension to use for the prediction. None uses all.
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+            If `None`, uses value of self.copy.
+        Returns
+        -------
+        r2_score : float
+            Returns r2 score of predictions.
+        """
+        y = self._validate_array(y, variable_name="y", ensure_2d=False)
+        if (y.shape[0] != X.shape[0]):
+            raise ValueError(
+                f"Inconsistent lengths between X and y ({X.shape=}, {y.shape=})"
+            )
+        yd = 1 if y.ndim == 1 else y.shape[1]
+        if (yd != self.y_loadings_.shape[0]):
+            raise ValueError(
+                f"Wrong number of features in y ({y.shape=}, should be ({X.shape[0], self.y_loadings_.shape[0]}))"
+            )
+        if (sample_weight is not None and sample_weight.shape != (y.shape[0],)):
+            sample_weight = self._validate_array(sample_weight,
+                                                 variable_name="sample_weight",
+                                                 ensure_2d=False)
+            raise ValueError(
+                f"Inconsistent lengths between sample_weight and y ({sample_weight.shape=}, {y.shape=})"
+            )
+        y_pred = self.predict(X, ndim=ndim, copy=copy)
+        return r2_score(y, y_pred, sample_weights=sample_weight)
 
-    def predict(self, X: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
+    def transform(self, X: np.ndarray, y: np.ndarray = None, *, copy=True) -> np.ndarray:
+        """Predict latent space of given samples.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            X-samples.
+        y : array-like of shape (n_samples) or (n_samples, yd), default=None
+            Y-samples. Ignored if None.
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+            If `None`, uses value of self.copy.
+        Returns
+        -------
+        x_scores : ndarray of shape (n_samples, n_features)
+            Returns predicted latent space of X.
+        y_scores : ndarray of shape (n_samples, yd), only if y is not None
+            Returns predicted latent space of y.
+        Notes
+        -----
+        This call requires the estimation of a matrix of shape
+        `(n_features, n_targets)`, which may be an issue in high dimensional
+        space.
+        """
+        self.check_is_fitted()
+        if (y is not None):
+            X, y = self.validate_input(X, y, copy=copy)
+        else:
+            X = self._validate_array(X, variable_name="X", copy=copy)
+        X -= self._x_mean
+        X /= self._x_std
+
+        x_scores = X @ self.x_rotations_
+
+        if (y is not None):
+            y -= self._y_mean
+            y /= self._y_std
+            y_scores = y @ self.y_rotations_
+            return x_scores, y_scores
+
+        return x_scores
+
+    def inverse_transform(self, x_scores: np.ndarray, y_scores: np.ndarray = None) -> np.ndarray:
+        """Predict latent space of given samples.
+        Parameters
+        ----------
+        x_scores : array-like of shape (n_samples, n_components)
+            X-scores (latent space).
+        y_scores : array-like of shape(n_samples, n_components), default=None
+            y-scores (latent space). Ignored if None.
+        copy : bool, default=True
+            Whether to copy `X` and `Y`, or perform in-place normalization.
+            If `None`, uses value of self.copy.
+        Returns
+        -------
+        X_hat : ndarray of shape (n_samples, n_features)
+            Returns predicted real space X.
+        y_hat : ndarray of shape (n_samples, yd), only if y_scores is not None
+            Returns predicted real space y.
+        Notes
+        -----
+        This call requires the estimation of a matrix of shape
+        `(n_features, n_targets)`, which may be an issue in high dimensional
+        space.
+        """
+        self.check_is_fitted()
+        if (y_scores is not None):
+            x_scores, y_scores = self.validate_input(x_scores,
+                                                     y_scores,
+                                                     copy=False)
+        else:
+            x_scores = self._validate_array(x_scores,
+                                            variable_name="X",
+                                            copy=False)
+
+        X_hat = x_scores @ self.x_loadings_.T
+        X_hat *= self._x_std
+        X_hat += self._x_mean
+
+        if (y_scores is not None):
+            y_hat = y_scores @ self.y_loadings_.T
+            y_hat *= self._y_std
+            y_hat += self._y_mean
+            return X_hat, y_hat
+
+        return X_hat
+
+    def predict(self, X: np.ndarray, *, ndim: int = None, copy=True) -> np.ndarray:
         """Predict targets of given samples.
         Parameters
         ----------
@@ -223,6 +321,7 @@ class PLS(
             Number of PLS dimension to use for the prediction. None uses all
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
+            If `None`, uses value of self.copy.
         Returns
         -------
         y_pred : ndarray of shape (n_samples,) or (n_samples, n_targets)
@@ -236,13 +335,13 @@ class PLS(
         if (ndim is None):
             ndim = self.n_components
 
-        check_is_fitted(self)
+        self.check_is_fitted()
 
         if (ndim > self.n_components):
             raise ValueError(
                 f"ndim is bigger than the number of components this object was trained with")
 
-        X = self._validate_data(X, copy=copy, dtype=FLOAT_DTYPES, reset=False)
+        X = self._validate_array(X, variable_name="X", copy=copy)
         # Normalize
         X -= self._x_mean
         X /= self._x_std
@@ -250,7 +349,7 @@ class PLS(
         Ypred = X @ self._all_coefs[ndim-1].T
         return Ypred + self.intercept_
 
-    def inverse_predict(self, Y: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
+    def inverse_predict(self, Y: np.ndarray, *, ndim: int = None, copy=True) -> np.ndarray:
         """Predict samples of given targets.
         With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
         along the given y-coordinates. For example:
@@ -264,7 +363,7 @@ class PLS(
         ----------
         Y : np.ndarray
             Array of shape(n_samples) or shape(n_samples, yd) targets. In the first case this is done as
-            linear interpolatio along the coefficient vector. In the latter the pseudo inverse of the coeficient matrix is calculated.
+            linear interpolation along the coefficient vector. In the latter the pseudo inverse of the coeficient matrix is calculated.
             When yd=1 these two methods are equal (up to machine precision).
 
         copy : bool, default=True
@@ -277,7 +376,7 @@ class PLS(
             Returns predicted values.
 
         """
-        check_is_fitted(self)
+        self.check_is_fitted()
 
         if (ndim is None):
             ndim = self.n_components
@@ -286,8 +385,8 @@ class PLS(
             raise ValueError(
                 f"ndim is bigger than the number of components this object was trained with")
 
-        Y = check_array(
-            Y, input_name="Y", ensure_2d=False, copy=copy, dtype=FLOAT_DTYPES
+        Y = self._validate_array(
+            Y, variable_name="Y", ensure_2d=False, copy=copy
         )
         # Center the Y values. _coef_ already has
         Y -= self.intercept_
