@@ -27,10 +27,18 @@ if (True):
 
     pls_md = PLS_MD(n_components=5).fit(u, y_train)
     pls = PLS(n_components=5).fit(X_train, y_train)
+    pls_flip = PLS(n_components=5, flip=True).fit(X_train, y_train)
+    pls_sklearn = PLSRegression(n_components=5).fit(X_train, y_train)
     u.load_new(X_test.reshape((X_test.shape[0], u.atoms.n_atoms, 3)))
     assert np.all(np.abs(pls_md.transform(u)-pls.transform(X_test)) < 1e-6)
     assert np.abs(pls_md.score(u, y_test)-pls.score(X_test, y_test)) < 1e-10
-
+    assert np.all(
+        np.abs(pls_sklearn.transform(X_test)-pls_flip.transform(X_test)) < 1e-6
+    )
+    assert np.abs(pls_sklearn.score(X_test, y_test) -
+                  pls_flip.score(X_test, y_test)) < 1e-10
+    assert np.abs(pls_sklearn.score(X_test, y_test) -
+                  pls.score(X_test, y_test)) < 1e-10
 
 if (True):
     fig1, axes1 = plt.subplots(1, 2)
