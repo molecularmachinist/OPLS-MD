@@ -112,3 +112,39 @@ def nipals(x: np.ndarray, y: np.ndarray,
         i += 1
 
     return w, c, t, u
+
+
+def r2_score(y_true: np.ndarray, y_hat: np.ndarray, sample_weights=None):
+    if (y_true.ndim == 1):
+        y_true = y_true[:, None]
+    if (y_hat.ndim == 1):
+        y_hat = y_hat[:, None]
+    if sample_weights is None:
+        weights = 1.0
+    else:
+        weights = sample_weights[:, None]
+
+    numerator = (weights*(y_true - y_hat) ** 2).sum(axis=0, dtype=np.float64)
+    y_mean = np.average(y_true, axis=0,
+                        weights=sample_weights)
+    denominator = (
+        weights * (y_true - y_mean) ** 2
+    ).sum(axis=0, dtype=np.float64)
+    # Both zero: perfect prediction of zero variance
+    both_zero = denominator == 0 * numerator == 0
+    denominator[both_zero] = 1.0
+    numerator[both_zero] = 1.0
+    return np.mean(1-numerator/denominator)
+
+
+def flip_scores_by_absolute_value(u: np.ndarray, v: np.ndarray):
+    """Flips u and v such that the biggest absolute value in u will have a positive sign.
+
+    Flipping makes the PLS model the same (up to machine precision) as with sklearn.
+
+    The flipping is done in place.
+    """
+    biggest_abs_val_idx = np.argmax(np.abs(u))
+    sign = np.sign(u[biggest_abs_val_idx])
+    u *= sign
+    v *= sign
