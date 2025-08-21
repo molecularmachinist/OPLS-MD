@@ -369,6 +369,14 @@ class OPLS_PLS_MD(_MD_OPLS_WRAPPER, OPLS_PLS):
         X = self._from_crd(crd)
         return super().transform_ortho(X, Y, copy=copy)
 
+    @overload
+    def inverse_transform_ortho(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+        ...
+
+    @overload
+    def inverse_transform_ortho(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
     def inverse_transform_ortho(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
         if Y is None:
             return self._from_crd(super().inverse_transform_ortho(X))

@@ -280,11 +280,11 @@ class PLS(
         return x_scores
 
     @overload
-    def inverse_transform(self, x_scores: np.ndarray, y_scores: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def inverse_transform(self, x_scores: np.ndarray, y_scores: None = None) -> np.ndarray:
         ...
 
     @overload
-    def inverse_transform(self, x_scores: np.ndarray, y_scores: None = None) -> np.ndarray:
+    def inverse_transform(self, x_scores: np.ndarray, y_scores: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         ...
 
     def inverse_transform(self, x_scores: np.ndarray, y_scores: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:

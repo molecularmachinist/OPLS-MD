@@ -340,11 +340,11 @@ class OPLS(
         return x_scores
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray:
         ...
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         ...
 
     def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:

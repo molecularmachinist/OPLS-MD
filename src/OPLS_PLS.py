@@ -179,6 +179,14 @@ class OPLS_PLS(OPLS):
         x_filt, y_filt = super().correct(X, Y, copy=copy)
         return self._pls.transform(x_filt, y_filt, copy=copy)
 
+    @overload
+    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+        ...
+
+    @overload
+    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
     def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None):
         """calculate inverse of the dimension reduction.
 
@@ -229,6 +237,14 @@ class OPLS_PLS(OPLS):
         """
         return super().transform(X, Y, copy=copy)
 
+    @overload
+    def inverse_transform_ortho(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+        ...
+
+    @overload
+    def inverse_transform_ortho(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
     def inverse_transform_ortho(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """calculate inverse of the dimension reduction.
 
@@ -249,11 +265,11 @@ class OPLS_PLS(OPLS):
         """
         return super().inverse_transform(X, Y)
 
-    def predict(self, X: np.ndarray, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
+    def predict(self, X: np.ndarray, *, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
         X_new = self.correct(X, copy=copy)
         return self.pls_.predict(X_new, ndim=ndim, copy=copy)
 
-    def inverse_predict(self, Y: np.ndarray, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
+    def inverse_predict(self, Y: np.ndarray, *, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
         return self.pls_.inverse_predict(Y, ndim=ndim, copy=copy)
 
     def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *,
