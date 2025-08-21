@@ -1,6 +1,7 @@
 """
 MD simulation wrappers for the PLS/OPLS objects in OPLS.py
 """
+from typing import TYPE_CHECKING, Literal, Optional, overload
 import numpy as np
 
 from MDAnalysis import Universe, AtomGroup  # type: ignore
@@ -9,17 +10,21 @@ from .OPLS import OPLS
 from .PLS import PLS
 from .OPLS_PLS import OPLS_PLS
 
-from typing import Union, Tuple
+# A dirty hack to make the super functions be loaded only when type checking
+if TYPE_CHECKING:
+    _Base_PLS = PLS
+else:
+    _Base_PLS = object
 
 
-class _MD_PLS_WRAPPER():
+class _MD_PLS_WRAPPER(_Base_PLS):
     """
     A wrapper class to wrap PLS object to accept MDAnalysis universes and atomg groups,
     as well as unflattened MD trajectories. Should NOT be instanciated as such, but through the PLS_MD class.
     The final class needs to first inherit this class, and only then the class which is wrapped.
     """
 
-    def _get_dims(self, crd: Union[np.ndarray, Universe, AtomGroup]):
+    def _get_dims(self, crd: np.ndarray | Universe | AtomGroup):
         if (type(crd) == Universe or type(crd) == AtomGroup):
             self.natoms = crd.atoms.n_atoms
             self.ndim = 3
@@ -33,7 +38,7 @@ class _MD_PLS_WRAPPER():
                     f"X is {crd.ndim} dimensional, should be 2 or 3")
             self.natoms = crd.shape[1]
 
-    def _from_crd(self, crd: Union[np.ndarray, Universe, AtomGroup]) -> np.ndarray:
+    def _from_crd(self, crd: np.ndarray | Universe | AtomGroup) -> np.ndarray:
         if (type(crd) == Universe):
             u = crd
             sel = crd.atoms
@@ -66,18 +71,44 @@ class _MD_PLS_WRAPPER():
     def _to_crd(self, X: np.ndarray) -> np.ndarray:
         return X.reshape(X.shape[0], self.natoms, self.ndim)
 
-    def fit(self, crd: Union[np.ndarray, Universe, AtomGroup], y: np.ndarray):
+    def fit(self, crd: np.ndarray | Universe | AtomGroup, y: np.ndarray):
         self._get_dims(crd)
         return super().fit(self._from_crd(crd), y)
 
+    @overload
     def transform(self,
-                  crd: Union[np.ndarray, Universe, AtomGroup],
-                  Y=None,
-                  copy=True):
+                  crd: np.ndarray | Universe | AtomGroup,
+                  Y: np.ndarray,
+                  *,
+                  copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def transform(self,
+                  crd: np.ndarray | Universe | AtomGroup,
+                  Y: None = None,
+                  *,
+                  copy: bool = True) -> np.ndarray:
+        ...
+
+    def transform(self,
+                  crd: np.ndarray | Universe | AtomGroup,
+                  Y: Optional[np.ndarray] = None,
+                  *,
+                  copy: bool = True):
         X = self._from_crd(crd)
         return super().transform(X, Y, copy=copy)
 
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray = None):
+    @overload
+    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray | Universe | AtomGroup, np.ndarray]:
+        ...
+
+    @overload
+    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray | Universe | AtomGroup:
+        ...
+
+    def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> \
+            np.ndarray | Universe | AtomGroup | tuple[np.ndarray | Universe | AtomGroup, np.ndarray]:
         if Y is None:
             return self._from_crd(super().inverse_transform(X))
         else:
@@ -86,44 +117,86 @@ class _MD_PLS_WRAPPER():
 
     def inverse_predict(self,
                         Y: np.ndarray,
-                        ndim: int = None,
+                        *,
+                        ndim: Optional[int] = None,
                         copy=True):
-        return self._to_crd(super().inverse_predict(Y, ndim, copy=copy))
+        return self._to_crd(super().inverse_predict(Y, ndim=ndim, copy=copy))
 
     def predict(self,
-                crd: Union[np.ndarray, Universe, AtomGroup],
-                ndim: int = None,
-                copy=True):
+                crd: np.ndarray | Universe | AtomGroup,
+                *,
+                ndim: Optional[int] = None,
+                copy: bool = True):
         X = self._from_crd(crd)
         return super().predict(X, ndim=ndim, copy=copy)
 
     def score(self,
-              crd: Union[np.ndarray, Universe, AtomGroup],
+              crd: np.ndarray | Universe | AtomGroup,
               y: np.ndarray,
-              ndim: int = None,
-              sample_weight: np.ndarray = None,
-              copy=True):
+              sample_weight: Optional[np.ndarray] = None,
+              *,
+              ndim: Optional[int] = None,
+              copy: bool = True) -> float:
         X = self._from_crd(crd)
-        return super().score(X, y, ndim=ndim, sample_weight=sample_weight, copy=copy)
+        return super().score(X, y, sample_weight=sample_weight, ndim=ndim, copy=copy)
 
 
-class _MD_OPLS_WRAPPER(_MD_PLS_WRAPPER):
+# A dirty hack to make the super functions be loaded only when type checking
+if TYPE_CHECKING:
+    class _Base_OPLS(OPLS, _MD_PLS_WRAPPER):
+        ...
+else:
+    _Base_OPLS = _MD_PLS_WRAPPER
+
+
+class _MD_OPLS_WRAPPER(_Base_OPLS):
     """
-    A wrapper class to wrap OPLS object to accept MDAnalysis universes and atomg groups,
+    A wrapper class to wrap OPLS object to accept MDAnalysis universes and atom groups,
     as well as unflattened MD trajectories. Should NOT be instanciated as such, but through the OPLS_MD class.
     The final class needs to first inherit this class, and only then the class which is wrapped.
 
     Only adds the wrapping for correct on top of _MD_PLS_WRAPPER
     """
 
-    def correct(self,
-                crd: Union[np.ndarray, Universe, AtomGroup],
-                y: np.ndarray = None,
+    @overload
+    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: None = None, *,
                 copy: bool = True,
-                return_ortho: bool = False) -> Union[
-            Tuple[np.ndarray, np.ndarray], np.ndarray]:
+                return_ortho: Literal[False] = False) -> np.ndarray:
+        ...
+
+    @overload
+    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: None = None, *,
+                copy: bool = True,
+                return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: np.ndarray, *,
+                copy: bool = True,
+                return_ortho: Literal[False] = False) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: np.ndarray, *,
+                copy: bool = True,
+                return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: Optional[np.ndarray] = None, *,
+                copy: bool = True,
+                return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray] |\
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        ...
+
+    def correct(self,
+                crd: np.ndarray | Universe | AtomGroup,
+                y: Optional[np.ndarray] = None,
+                *,
+                copy: bool = True,
+                return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, ...]:
         X = self._from_crd(crd)
-        return super().correct(X, y, copy, return_ortho)
+        return super().correct(X, y, copy=copy, return_ortho=return_ortho)
 
 
 class PLS_MD(_MD_PLS_WRAPPER, PLS):
@@ -274,16 +347,22 @@ class OPLS_PLS_MD(_MD_OPLS_WRAPPER, OPLS_PLS):
         The wrapped PLS model
     """
 
-    def transform_ortho(self,
-                        crd: Union[np.ndarray, Universe, AtomGroup],
-                        Y: np.ndarray = None,
-                        copy=True) -> Union[
-            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-        X = self._from_crd(crd)
-        return super().transform_ortho(X, Y, copy)
+    @overload
+    def transform_ortho(self, crd: np.ndarray | Universe | AtomGroup, Y: np.ndarray, *, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
 
-    def inverse_transform_ortho(self, X: np.ndarray, Y: np.ndarray = None) -> Union[
-            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    @overload
+    def transform_ortho(self, crd: np.ndarray | Universe | AtomGroup, Y: None = None, *, copy: bool = True) -> np.ndarray:
+        ...
+
+    def transform_ortho(self,
+                        crd: np.ndarray | Universe | AtomGroup,
+                        Y: Optional[np.ndarray] = None, *,
+                        copy: bool = True) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
+        X = self._from_crd(crd)
+        return super().transform_ortho(X, Y, copy=copy)
+
+    def inverse_transform_ortho(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
         if Y is None:
             return self._from_crd(super().inverse_transform_ortho(X))
         else:

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-from typing import Union, Tuple
-
+from typing import Literal, Optional, overload
 import numpy as np
 from numpy import linalg as la
 from scipy.linalg import pinv
@@ -96,7 +95,7 @@ class OPLS(
     def __repr__(self):
         return f"{type(self).__name__}(n_components={self.n_components}, algorithm={repr(self.algorithm)}, deflation_mode={repr(self.deflation_mode)})"
 
-    def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS":
+    def fit(self, x: np.ndarray, y: np.ndarray):
         """
         Fit OPLS model.
 
@@ -281,16 +280,24 @@ class OPLS(
         self.fitted = True
         return self
 
-    def predict(self, X: np.ndarray, ndim=None, copy=True) -> np.ndarray:
+    def predict(self, X: np.ndarray, *, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
         raise NotImplementedError("predict not available with OPLS")
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim=None) -> float:
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *, ndim: Optional[int] = None, copy: bool = True) -> float:
         raise NotImplementedError("score not available with OPLS")
 
-    def inverse_predict(self, Y, ndim=None, copy=True):
+    def inverse_predict(self, Y, *, ndim: Optional[int] = None, copy: bool = True):
         raise NotImplementedError("inverse_predict not available with OPLS")
 
-    def transform(self, X: np.ndarray, Y: np.ndarray = None, copy=True):
+    @overload
+    def transform(self, X: np.ndarray, Y: np.ndarray, *, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def transform(self, X: np.ndarray, Y: None = None, *, copy: bool = True) -> np.ndarray:
+        ...
+
+    def transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None, *, copy: bool = True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """Apply the dimension reduction to get the orthogonal scores.
 
         Parameters
@@ -332,7 +339,15 @@ class OPLS(
 
         return x_scores
 
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray = None):
+    @overload
+    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+        ...
+
+    def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """calculate inverse of the dimension reduction.
 
         Parameters
@@ -368,8 +383,40 @@ class OPLS(
 
         return x_new
 
-    def correct(self, X: np.ndarray, y: np.ndarray = None, copy: bool = True, return_ortho: bool = False) -> Union[
-            Tuple[np.ndarray, np.ndarray], np.ndarray]:
+    @overload
+    def correct(self, X: np.ndarray, y: None = None, *,
+                copy: bool = True,
+                return_ortho: Literal[False] = False) -> np.ndarray:
+        ...
+
+    @overload
+    def correct(self, X: np.ndarray, y: None = None, *,
+                copy: bool = True,
+                return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def correct(self, X: np.ndarray, y: np.ndarray, *,
+                copy: bool = True,
+                return_ortho: Literal[False] = False) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def correct(self, X: np.ndarray, y: np.ndarray, *,
+                copy: bool = True,
+                return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def correct(self, X: np.ndarray, y: Optional[np.ndarray] = None, *,
+                copy: bool = True,
+                return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray] |\
+            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        ...
+
+    def correct(self, X: np.ndarray, y: Optional[np.ndarray] = None, *,
+                copy: bool = True,
+                return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, ...]:
         """
         Remove orthogonal components from X (and possibly y)
 

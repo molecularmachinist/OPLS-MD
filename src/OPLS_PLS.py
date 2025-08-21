@@ -1,5 +1,4 @@
-from typing import Union, Tuple
-
+from typing import Optional, overload
 import numpy as np
 
 from .PLS import PLS
@@ -88,7 +87,7 @@ class OPLS_PLS(OPLS):
     def __repr__(self):
         return f"{type(self).__name__}(n_components={self.n_components}, pls_components={self.pls_components}, algorithm={repr(self.algorithm)}, deflation_mode={repr(self.deflation_mode)})"
 
-    def fit(self, x: np.ndarray, y: np.ndarray) -> "OPLS_PLS":
+    def fit(self, x: np.ndarray, y: np.ndarray):
         """
         Fit OPLS and PLS models.
         Parameters
@@ -151,8 +150,15 @@ class OPLS_PLS(OPLS):
 
         return self
 
-    def transform(self, X: np.ndarray, Y: np.ndarray = None, copy=True) -> Union[
-            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    @overload
+    def transform(self, X: np.ndarray, Y: np.ndarray, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def transform(self, X: np.ndarray, Y: None = None, copy: bool = True) -> np.ndarray:
+        ...
+
+    def transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None, copy: bool = True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """Remove the orthogonal components and apply the dimension reduction.
 
         Parameters
@@ -177,8 +183,7 @@ class OPLS_PLS(OPLS):
         x_filt, y_filt = super().correct(X, Y, copy=copy)
         return self._pls.transform(x_filt, y_filt, copy=copy)
 
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray = None) -> Union[
-            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None):
         """calculate inverse of the dimension reduction.
 
         Parameters
@@ -197,8 +202,16 @@ class OPLS_PLS(OPLS):
         """
         return self._pls.inverse_transform(X, Y)
 
-    def transform_ortho(self, X: np.ndarray, Y: np.ndarray = None, copy=True) -> Union[
-            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    @overload
+    def transform_ortho(self, X: np.ndarray, Y: np.ndarray, *, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def transform_ortho(self, X: np.ndarray, Y: None = None, *, copy: bool = True) -> np.ndarray:
+        ...
+
+    def transform_ortho(self, X: np.ndarray, Y: Optional[np.ndarray] = None, *,
+                        copy: bool = True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """Apply the dimension reduction to get the orthogonal components.
 
         Parameters
@@ -220,8 +233,7 @@ class OPLS_PLS(OPLS):
         """
         return super().transform(X, Y, copy=copy)
 
-    def inverse_transform_ortho(self, X: np.ndarray, Y: np.ndarray = None) -> Union[
-            np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    def inverse_transform_ortho(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """calculate inverse of the dimension reduction.
 
         Parameters
@@ -241,15 +253,14 @@ class OPLS_PLS(OPLS):
         """
         return super().inverse_transform(X, Y)
 
-    def predict(self, X: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
-        self.check_is_fitted()
+    def predict(self, X: np.ndarray, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
         X_new = self.correct(X, copy=copy)
-        return self.pls_.predict(X_new, ndim, copy=copy)
+        return self.pls_.predict(X_new, ndim=ndim, copy=copy)
 
-    def inverse_predict(self, Y: np.ndarray, ndim: int = None, copy=True) -> np.ndarray:
-        self.check_is_fitted()
-        return self.pls_.inverse_predict(Y, ndim, copy=copy)
+    def inverse_predict(self, Y: np.ndarray, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
+        return self.pls_.inverse_predict(Y, ndim=ndim, copy=copy)
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, ndim: int = None) -> float:
-        self.check_is_fitted()
-        return self.pls_.score(*self.correct(X, y), sample_weight=sample_weight, ndim=ndim)
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *,
+              ndim: Optional[int] = None,
+              copy: bool = True) -> float:
+        return self.pls_.score(*self.correct(X, y, copy=copy), sample_weight=sample_weight, ndim=ndim, copy=copy)

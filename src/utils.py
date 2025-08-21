@@ -1,10 +1,10 @@
-from typing import Tuple
-
 import numpy as np
 from numpy import linalg as la
 
+from typing import Optional
 
-def center_scale_data(X: np.ndarray, Y: np.ndarray, center=True, scale=True) -> Tuple[
+
+def center_scale_data(X: np.ndarray, Y: np.ndarray, center=True, scale=True) -> tuple[
         np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Centering and scaling of 2d arrays X and Y, along the first dimension.
@@ -62,7 +62,7 @@ def center_scale_data(X: np.ndarray, Y: np.ndarray, center=True, scale=True) -> 
 
 def nipals(x: np.ndarray, y: np.ndarray,
            tol: float = 1e-10,
-           max_iter: int = 10000) -> Tuple[
+           max_iter: int = 10000) -> tuple[
         np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Non-linear Iterative Partial Least Squares
@@ -100,7 +100,7 @@ def nipals(x: np.ndarray, y: np.ndarray,
     u = y[:, 0]
     u = u[:, np.newaxis]
     i = 0
-    d = tol * 10
+    d: np.floating | float = tol * 10
     while d > tol and i <= max_iter:
         w = (x.T @ u) / (u.T @ u)
         w /= la.norm(w)
@@ -114,13 +114,13 @@ def nipals(x: np.ndarray, y: np.ndarray,
     return w, c, t, u
 
 
-def r2_score(y_true: np.ndarray, y_hat: np.ndarray, sample_weights=None):
+def r2_score(y_true: np.ndarray, y_hat: np.ndarray, sample_weights: Optional[np.ndarray] = None) -> float:
     if (y_true.ndim == 1):
         y_true = y_true[:, None]
     if (y_hat.ndim == 1):
         y_hat = y_hat[:, None]
     if sample_weights is None:
-        weights = 1.0
+        weights: float | np.ndarray = 1.0
     else:
         weights = sample_weights[:, None]
 

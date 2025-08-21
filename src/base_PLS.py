@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 
 
@@ -24,7 +25,7 @@ class _PLS:
 
     def _validate_array(self, x: np.ndarray, *,
                         variable_name="x",
-                        copy: bool = None,
+                        copy: Optional[bool] = None,
                         ensure_min_samples: int = 2,
                         ensure_2d: bool = True):
         if not isinstance(x, np.ndarray):
@@ -57,7 +58,7 @@ class _PLS:
         return np.array(x, dtype=dtype, copy=copy)
 
     def validate_input(self, x: np.ndarray, y: np.ndarray, *,
-                       copy: bool = None,
+                       copy: Optional[bool] = None,
                        ensure_min_samples: int = 2,
                        allow_univariate_y=True):
         x = self._validate_array(x, variable_name="x",

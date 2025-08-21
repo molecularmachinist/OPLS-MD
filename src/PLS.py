@@ -1,3 +1,4 @@
+from typing import Optional, overload, Literal
 import numpy as np
 from scipy.linalg import pinv
 
@@ -44,7 +45,7 @@ class PLS(
     def __repr__(self):
         return f"{type(self).__name__}(n_components={self.n_components}, deflation_mode={repr(self.deflation_mode)})"
 
-    def fit(self, x: np.ndarray, y: np.ndarray) -> "PLS":
+    def fit(self, x: np.ndarray, y: np.ndarray):
         """
         Fit PLS model.
         Parameters
@@ -187,7 +188,7 @@ class PLS(
         self.fitted = True
         return self
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None, *, ndim: int = None, copy=True) -> float:
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *, ndim: Optional[int] = None, copy: bool = True) -> float:
         """Predict targets of given samples.
         Parameters
         ----------
@@ -225,7 +226,15 @@ class PLS(
         y_pred = self.predict(X, ndim=ndim, copy=copy)
         return r2_score(y, y_pred, sample_weights=sample_weight)
 
-    def transform(self, X: np.ndarray, y: np.ndarray = None, *, copy=True) -> np.ndarray:
+    @overload
+    def transform(self, X: np.ndarray, y: np.ndarray, *, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def transform(self, X: np.ndarray, y: None = None, *, copy: bool = True) -> np.ndarray:
+        ...
+
+    def transform(self, X: np.ndarray, y: Optional[np.ndarray] = None, *, copy=True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """Predict latent space of given samples.
         Parameters
         ----------
@@ -266,7 +275,15 @@ class PLS(
 
         return x_scores
 
-    def inverse_transform(self, x_scores: np.ndarray, y_scores: np.ndarray = None) -> np.ndarray:
+    @overload
+    def inverse_transform(self, x_scores: np.ndarray, y_scores: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        ...
+
+    @overload
+    def inverse_transform(self, x_scores: np.ndarray, y_scores: None = None) -> np.ndarray:
+        ...
+
+    def inverse_transform(self, x_scores: np.ndarray, y_scores: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         """Predict latent space of given samples.
         Parameters
         ----------
@@ -311,7 +328,7 @@ class PLS(
 
         return X_hat
 
-    def predict(self, X: np.ndarray, *, ndim: int = None, copy=True) -> np.ndarray:
+    def predict(self, X: np.ndarray, *, ndim: Optional[int] = None, copy=True) -> np.ndarray:
         """Predict targets of given samples.
         Parameters
         ----------
@@ -349,7 +366,7 @@ class PLS(
         Ypred = X @ self._all_coefs[ndim-1].T
         return Ypred + self.intercept_
 
-    def inverse_predict(self, Y: np.ndarray, *, ndim: int = None, copy=True) -> np.ndarray:
+    def inverse_predict(self, Y: np.ndarray, *, ndim: Optional[int] = None, copy=True) -> np.ndarray:
         """Predict samples of given targets.
         With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
         along the given y-coordinates. For example:
