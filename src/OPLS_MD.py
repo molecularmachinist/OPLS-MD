@@ -3,11 +3,7 @@ MD simulation wrappers for the PLS/OPLS objects in OPLS.py
 """
 import numpy as np
 
-try:
-    from MDAnalysis import Universe, AtomGroup
-except ImportError as e:
-    Universe = None
-    AtomGroup = None
+from MDAnalysis import Universe, AtomGroup  # type: ignore
 
 from .OPLS import OPLS
 from .PLS import PLS
