@@ -16,6 +16,8 @@ class PLS(
         Number of components to fit.
     scale : bool, default=True
         Whether to scale X and Y to unit variance
+    center : bool, default=True
+        Whether to centre X and Y to zero mean
     flip : bool, default=False
         Whether to flip the singular vectors for compatibility with different solvers.
         With flip=True and deflation_mode="regression" the PLS model will be the same

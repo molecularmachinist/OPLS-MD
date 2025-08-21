@@ -23,6 +23,7 @@ class _MD_PLS_WRAPPER(_Base_PLS):
     as well as unflattened MD trajectories. Should NOT be instanciated as such, but through the PLS_MD class.
     The final class needs to first inherit this class, and only then the class which is wrapped.
     """
+    # This "Mixin" class is used instead of inheritance to be able to use he same wrappers for PLS and OPLS
 
     def _get_dims(self, crd: np.ndarray | Universe | AtomGroup):
         if (type(crd) == Universe or type(crd) == AtomGroup):
@@ -213,6 +214,8 @@ class PLS_MD(_MD_PLS_WRAPPER, PLS):
         Number of components to fit.
     scale : bool, default=True
         Whether to scale X and Y to unit variance
+    center : bool, default=True
+        Whether to centre X and Y to zero mean
     flip : bool, default=False
         Whether to flip the singular vectors for compatibility with different solvers.
         With flip=True and deflation_mode="regression" the PLS model will be the same
@@ -254,6 +257,8 @@ class OPLS_MD(_MD_OPLS_WRAPPER, OPLS):
         Number of components to fit.
     scale : bool, default=True
         Whether to scale X and Y to unit variance
+    center : bool, default=True
+        Whether to centre X and Y to zero mean
     flip : bool, default=False
         Whether to flip the singular vectors for compatibility with different solvers.
         With flip=True and deflation_mode="regression" the first PLS component will be
@@ -310,6 +315,8 @@ class OPLS_PLS_MD(_MD_OPLS_WRAPPER, OPLS_PLS):
         Number of components to fit.
     scale : bool, default=True
         Whether to scale X and Y to unit variance
+    center : bool, default=True
+        Whether to centre X and Y to zero mean
     flip : bool, default=False
         Whether to flip the singular vectors for compatibility with different solvers.
         With flip=True and deflation_mode="regression" the first PLS component will be
