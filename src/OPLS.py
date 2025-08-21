@@ -104,13 +104,9 @@ class OPLS(
         Parameters
         ----------
         x: np.ndarray
-            Variable matrix with size n samples by xd variables.
+            Variable matrix with shape (n_samples, n_features)
         y: np.ndarray
-            Dependent matrix with size n samples by yd, or a vector. For now only t==1 is tested.
-        n_comp: int
-            Number of components, default is None, which indicates that
-            largest dimension which is smaller value between n and p
-            will be used.
+            Dependent matrix with shape (n_samples, n_targets) or (n_samples,). For now only n_targets==1 is tested.
 
         Returns
         -------
@@ -285,7 +281,9 @@ class OPLS(
     def predict(self, X: np.ndarray, *, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
         raise NotImplementedError("predict not available with OPLS")
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *, ndim: Optional[int] = None, copy: bool = True) -> float:
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *,
+              ndim: Optional[int] = None,
+              copy: bool = True) -> float:
         raise NotImplementedError("score not available with OPLS")
 
     def inverse_predict(self, Y, *, ndim: Optional[int] = None, copy: bool = True):
@@ -305,9 +303,9 @@ class OPLS(
         Parameters
         ----------
         X : np.ndarray
-            shape(n, xd) coordinates to transform.
+            shape(n_samples, n_features) coordinates to transform.
         Y : np.ndarray, default=None
-            shape(n,yd) targets to transform (optional)
+            shape(n_samples, n_targets) targets to transform (optional)
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
 
@@ -355,16 +353,16 @@ class OPLS(
         Parameters
         ----------
         X : np.ndarray
-            shape(n, n_comp) scores to inverse transform.
+            shape(n_samples, n_comp) scores to inverse transform.
         Y : np.ndarray, default=None
-            shape(n, n_comp) scores to inverse transform (optional)
+            shape(n_samples, n_comp) scores to inverse transform (optional)
 
         Returns
         -------
         x_scores : np.ndarray
-            shape(n, xd) estimate of X-coordinates.
+            shape(n_samples, n_features) estimate of X-coordinates.
         y_scores : np.ndarray
-            shape(n, yd) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
+            shape(n_samples, n_targets) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
             only returned if Y is not None.
         """
         self.check_is_fitted()
@@ -425,11 +423,10 @@ class OPLS(
         Parameters
         ----------
         X: np.ndarray
-            Data matrix with shape(n, c), where n is number of
-            samples, and c is number of variables
+            Data matrix with shape(n_samples, n_features)
         y: np.ndarray | None
-            Data matrix shape(n) or shape(n, t), where n is the number of samples
-            and t the number of features in y. If None, only X is corrected and returned.
+            Data matrix shape(n_samples) or shape(n_samples, n_targets).
+            If None, only X is corrected and returned.
             If the algorithm was OPLS, the corrected y is simply a copy of y.
         copy: bool
             Wether to work on and return copies of data. Default is True.
@@ -439,13 +436,13 @@ class OPLS(
         Returns
         -------
         x_new: np.ndarray
-            Corrected data, shape(n, c).
+            Corrected data, shape(n_samples, n_features).
         x_ortho: np.ndarray
-            Orthogonal score, shape(n, c). Returned if return _ortho=True.
+            Orthogonal score, shape(n_samples, n_features). Returned if return _ortho=True.
         y_new: np.ndarray
-            Corrected data, shape(n, t). Returned if y is not None.
+            Corrected data, shape(n_samples, n_targets). Returned if y is not None.
         y_ortho: np.ndarray
-            Orthogonal score, shape(n, t). Returned if y is not None and return _ortho=True.
+            Orthogonal score, shape(n_samples, n_targets). Returned if y is not None and return _ortho=True.
         """
         self.check_is_fitted()
         if (not y is None):

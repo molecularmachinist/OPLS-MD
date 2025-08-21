@@ -53,9 +53,9 @@ class PLS(
         Parameters
         ----------
         x: np.ndarray
-            Variable matrix with size n samples by xd variables.
+            Variable matrix with size n samples by n_features variables.
         y: np.ndarray
-            Dependent matrix with size n samples by yd, or a vector. For now only t==1 is implemented.
+            Dependent matrix with size n samples by n_targets, or a vector. For now only t==1 is implemented.
         n_comp: int
             Number of components, default is None, which indicates that
             largest dimension which is smaller value between n and p
@@ -190,13 +190,15 @@ class PLS(
         self.fitted = True
         return self
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *, ndim: Optional[int] = None, copy: bool = True) -> float:
+    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *,
+              ndim: Optional[int] = None,
+              copy: bool = True) -> float:
         """Predict targets of given samples.
         Parameters
         ----------
         X : array-like of shape(n_samples, n_features)
             Samples.
-        y : array-like of shape shape (n_samples) or (n_samples, yd)
+        y : array-like of shape shape (n_samples) or (n_samples, n_targets)
             True y-values
         ndim : int|None, default None
             Number of PLS dimension to use for the prediction. None uses all.
@@ -242,7 +244,7 @@ class PLS(
         ----------
         X : array-like of shape (n_samples, n_features)
             X-samples.
-        y : array-like of shape (n_samples) or (n_samples, yd), default=None
+        y : array-like of shape (n_samples) or (n_samples, n_targets), default=None
             Y-samples. Ignored if None.
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
@@ -251,7 +253,7 @@ class PLS(
         -------
         x_scores : ndarray of shape (n_samples, n_features)
             Returns predicted latent space of X.
-        y_scores : ndarray of shape (n_samples, yd), only if y is not None
+        y_scores : ndarray of shape (n_samples, n_targets), only if y is not None
             Returns predicted latent space of y.
         Notes
         -----
@@ -300,7 +302,7 @@ class PLS(
         -------
         X_hat : ndarray of shape (n_samples, n_features)
             Returns predicted real space X.
-        y_hat : ndarray of shape (n_samples, yd), only if y_scores is not None
+        y_hat : ndarray of shape (n_samples, n_targets), only if y_scores is not None
             Returns predicted real space y.
         Notes
         -----
@@ -343,7 +345,7 @@ class PLS(
             If `None`, uses value of self.copy.
         Returns
         -------
-        y_pred : ndarray of shape (n_samples,) or (n_samples, n_targets)
+        y_pred : ndarray of shape (n_samples, n_targets)
             Returns predicted values.
         Notes
         -----
@@ -381,9 +383,9 @@ class PLS(
         Parameters
         ----------
         Y : np.ndarray
-            Array of shape(n_samples) or shape(n_samples, yd) targets. In the first case this is done as
+            Array of shape(n_samples) or shape(n_samples, n_targets) targets. In the first case this is done as
             linear interpolation along the coefficient vector. In the latter the pseudo inverse of the coeficient matrix is calculated.
-            When yd=1 these two methods are equal (up to machine precision).
+            When n_targets=1 these two methods are equal (up to machine precision).
 
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
@@ -391,7 +393,7 @@ class PLS(
         Returns
         -------
         X_pred : np.ndarray
-            shape (n_samples,) or (n_samples, n_targets)
+            shape (n_samples, n_features)
             Returns predicted values.
 
         """

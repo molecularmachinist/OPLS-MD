@@ -93,13 +93,9 @@ class OPLS_PLS(OPLS):
         Parameters
         ----------
         x: np.ndarray
-            Variable matrix with size n samples by xd variables.
+            Variable matrix with shape (n_samples, n_features)
         y: np.ndarray
-            Dependent matrix with size n samples by yd, or a vector. For now only t==1 is tested.
-        n_comp: int
-            Number of components, default is None, which indicates that
-            largest dimension which is smaller value between n and p
-            will be used.
+            Dependent matrix with shape (n_samples, n_targets) or (n_samples,). For now only n_targets==1 is tested.
 
         Returns
         -------
@@ -164,9 +160,9 @@ class OPLS_PLS(OPLS):
         Parameters
         ----------
         X : np.ndarray
-            shape(n, xd) coordinates to transform.
+            shape(n_samples, n_features) coordinates to transform.
         Y : np.ndarray, default=None
-            shape(n,yd) targets to transform (optional)
+            shape(n_samples, n_targets) targets to transform (optional)
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
 
@@ -189,16 +185,16 @@ class OPLS_PLS(OPLS):
         Parameters
         ----------
         X : np.ndarray
-            shape(n, n_comp) scores to inverse transform.
+            shape(n_samples, n_comp) scores to inverse transform.
         Y : np.ndarray, default=None
-            shape(n, n_comp) scores to inverse transform (optional)
+            shape(n_samples, n_comp) scores to inverse transform (optional)
 
         Returns
         -------
         x_scores : np.ndarray
-            shape(n, xd) estimate of X-coordinates.
+            shape(n_samples, n_features) estimate of X-coordinates.
         y_scores : np.ndarray
-            shape(n, yd) estimate of y-targets, only returned if Y is not None.
+            shape(n_samples, n_targets) estimate of y-targets, only returned if Y is not None.
         """
         return self._pls.inverse_transform(X, Y)
 
@@ -217,18 +213,18 @@ class OPLS_PLS(OPLS):
         Parameters
         ----------
         X : np.ndarray
-            shape(n, xd) coordinates to transform.
+            shape(n_samples, n_features) coordinates to transform.
         Y : np.ndarray, default=None
-            shape(n,yd) targets to transform (optional)
+            shape(n_samples, n_targets) targets to transform (optional)
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
 
         Returns
         -------
         x_scores : np.ndarray
-            shape(n, n_comp) orthogonal x-scores.
+            shape(n_samples, n_comp) orthogonal x-scores.
         y_scores : np.ndarray
-            shape(n, n_comp) orthogonal y-scores OR unchanged Y if algorithm=="OPLS"
+            shape(n_samples, n_comp) orthogonal y-scores OR unchanged Y if algorithm=="OPLS"
             only returned if Y is not None.
         """
         return super().transform(X, Y, copy=copy)
@@ -239,16 +235,16 @@ class OPLS_PLS(OPLS):
         Parameters
         ----------
         X : np.ndarray
-            shape(n, n_comp) scores to inverse transform.
+            shape(n_samples, n_comp) scores to inverse transform.
         Y : np.ndarray, default=None
-            shape(n, n_comp) scores to inverse transform (optional)
+            shape(n_samples, n_comp) scores to inverse transform (optional)
 
         Returns
         -------
         x_scores : np.ndarray
-            shape(n, xd) estimate of X-coordinates.
+            shape(n_samples, n_features) estimate of X-coordinates.
         y_scores : np.ndarray
-            shape(n, yd) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
+            shape(n_samples, n_targets) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
             only returned if Y is not None.
         """
         return super().inverse_transform(X, Y)

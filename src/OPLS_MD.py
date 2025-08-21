@@ -101,11 +101,11 @@ class _MD_PLS_WRAPPER(_Base_PLS):
         return super().transform(X, Y, copy=copy)
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray | Universe | AtomGroup, np.ndarray]:
+    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray | Universe | AtomGroup:
         ...
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray | Universe | AtomGroup:
+    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray | Universe | AtomGroup, np.ndarray]:
         ...
 
     def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> \
