@@ -6,6 +6,7 @@ from scipy.linalg import pinv
 
 from .base_PLS import _PLS
 from .utils import center_scale_data, nipals, flip_scores_by_absolute_value
+from .utils import NDArray1D, NDArray2D, NDArray1or2D
 
 
 class OPLS(
@@ -97,7 +98,7 @@ class OPLS(
     def __repr__(self):
         return f"{type(self).__name__}(n_components={self.n_components}, algorithm={repr(self.algorithm)}, deflation_mode={repr(self.deflation_mode)})"
 
-    def fit(self, x: np.ndarray, y: np.ndarray):
+    def fit(self, x: NDArray2D, y: NDArray1or2D):
         """
         Fit OPLS model.
 
@@ -122,7 +123,7 @@ class OPLS(
         [3] https://scikit-learn.org/stable/modules/cross_decomposition.html#cross-decomposition
         """
         X, Y = self.validate_input(x, y)
-        if (Y.ndim == 1):
+        if (len(Y.shape) == 1):
             Y = Y[:, np.newaxis]
 
         n, xd = X.shape
@@ -278,26 +279,25 @@ class OPLS(
         self.fitted = True
         return self
 
-    def predict(self, X: np.ndarray, *, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
+    def predict(self, X: NDArray2D, *, ndim: Optional[int] = None, copy: bool = True) -> NDArray2D:
         raise NotImplementedError("predict not available with OPLS")
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *,
-              ndim: Optional[int] = None,
-              copy: bool = True) -> float:
+    def score(self, X: NDArray2D, y: NDArray1or2D, sample_weight: Optional[NDArray1D] = None, *,
+              ndim: Optional[int] = None, copy: bool = True) -> np.floating:
         raise NotImplementedError("score not available with OPLS")
 
     def inverse_predict(self, Y, *, ndim: Optional[int] = None, copy: bool = True):
         raise NotImplementedError("inverse_predict not available with OPLS")
 
     @overload
-    def transform(self, X: np.ndarray, Y: np.ndarray, *, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+    def transform(self, X: NDArray2D, Y: NDArray2D, *, copy: bool = True) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def transform(self, X: np.ndarray, Y: None = None, *, copy: bool = True) -> np.ndarray:
+    def transform(self, X: NDArray2D, Y: None = None, *, copy: bool = True) -> NDArray2D:
         ...
 
-    def transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None, *, copy: bool = True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def transform(self, X: NDArray2D, Y: Optional[NDArray2D] = None, *, copy: bool = True) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         """Apply the dimension reduction to get the orthogonal scores.
 
         Parameters
@@ -340,14 +340,14 @@ class OPLS(
         return x_scores
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+    def inverse_transform(self, X: NDArray2D, Y: None = None) -> NDArray2D:
         ...
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def inverse_transform(self, X: NDArray2D, Y: NDArray2D) -> tuple[NDArray2D, NDArray2D]:
         ...
 
-    def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def inverse_transform(self, X: NDArray2D, Y: Optional[NDArray2D] = None) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         """calculate inverse of the dimension reduction.
 
         Parameters
@@ -384,39 +384,39 @@ class OPLS(
         return x_new
 
     @overload
-    def correct(self, X: np.ndarray, y: None = None, *,
+    def correct(self, X: NDArray2D, y: None = None, *,
                 copy: bool = True,
-                return_ortho: Literal[False] = False) -> np.ndarray:
+                return_ortho: Literal[False] = False) -> NDArray2D:
         ...
 
     @overload
-    def correct(self, X: np.ndarray, y: None = None, *,
+    def correct(self, X: NDArray2D, y: None = None, *,
                 copy: bool = True,
-                return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray]:
+                return_ortho: Literal[True] = True) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def correct(self, X: np.ndarray, y: np.ndarray, *,
+    def correct(self, X: NDArray2D, y: NDArray1or2D, *,
                 copy: bool = True,
-                return_ortho: Literal[False] = False) -> tuple[np.ndarray, np.ndarray]:
+                return_ortho: Literal[False] = False) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def correct(self, X: np.ndarray, y: np.ndarray, *,
+    def correct(self, X: NDArray2D, y: NDArray1or2D, *,
                 copy: bool = True,
-                return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                return_ortho: Literal[True] = True) -> tuple[NDArray2D, NDArray2D, NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def correct(self, X: np.ndarray, y: Optional[np.ndarray] = None, *,
+    def correct(self, X: NDArray2D, y: Optional[NDArray1or2D] = None, *,
                 copy: bool = True,
-                return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray] |\
-            tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                return_ortho: bool = False) -> NDArray2D | tuple[NDArray2D, NDArray2D] |\
+            tuple[NDArray2D, NDArray2D, NDArray2D, NDArray2D]:
         ...
 
-    def correct(self, X: np.ndarray, y: Optional[np.ndarray] = None, *,
+    def correct(self, X: NDArray2D, y: Optional[NDArray1or2D] = None, *,
                 copy: bool = True,
-                return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, ...]:
+                return_ortho: bool = False) -> NDArray2D | tuple[NDArray2D, ...]:
         """
         Remove orthogonal components from X (and possibly y)
 
@@ -516,26 +516,26 @@ class OPLS(
         return x_new, x_ortho
 
     @property
-    def predictive_scores(self) -> np.ndarray:
+    def predictive_scores(self) -> NDArray2D:
         """ Orthogonal loadings. """
         return self._x_scores
 
     @property
-    def predictive_loadings(self) -> np.ndarray:
+    def predictive_loadings(self) -> NDArray2D:
         """ Predictive loadings. """
         return self._x_loadings
 
     @property
-    def weights_y(self) -> np.ndarray:
+    def weights_y(self) -> NDArray2D:
         """ y scores. """
         return self._y_weights
 
     @property
-    def orthogonal_loadings(self) -> np.ndarray:
+    def orthogonal_loadings(self) -> NDArray2D:
         """ Orthogonal loadings. """
         return self._Portho
 
     @property
-    def orthogonal_scores(self) -> np.ndarray:
+    def orthogonal_scores(self) -> NDArray2D:
         """ Orthogonal scores. """
         return self._Tortho

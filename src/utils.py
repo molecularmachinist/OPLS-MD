@@ -1,11 +1,16 @@
 import numpy as np
 from numpy import linalg as la
 
-from typing import Optional
+from typing import Optional, TypeAlias
+
+NDArray1D: TypeAlias = np.ndarray[tuple[int], np.dtype[np.floating]]
+NDArray2D: TypeAlias = np.ndarray[tuple[int, int], np.dtype[np.floating]]
+NDArray1or2D: TypeAlias = NDArray1D | NDArray2D
+NDArray3D: TypeAlias = np.ndarray[tuple[int, int, int], np.dtype[np.floating]]
 
 
-def center_scale_data(X: np.ndarray, Y: np.ndarray, center=True, scale=True) -> tuple[
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def center_scale_data(X: NDArray2D, Y: NDArray2D, center: bool = True, scale: bool = True) -> tuple[
+        NDArray2D, NDArray2D, NDArray1D, NDArray1D, NDArray1D, NDArray1D]:
     """
     Centering and scaling of 2d arrays X and Y, along the first dimension.
     The input array will not be copied and the returned references should match the input
@@ -38,8 +43,8 @@ def center_scale_data(X: np.ndarray, Y: np.ndarray, center=True, scale=True) -> 
         if center=False or scale=False it is all ones.
     """
     if (center):
-        x_mean = X.mean(axis=0)
-        y_mean = Y.mean(axis=0)
+        x_mean: NDArray1D = X.mean(axis=0)
+        y_mean: NDArray1D = Y.mean(axis=0)
         X -= x_mean
         Y -= y_mean
     else:
@@ -60,10 +65,10 @@ def center_scale_data(X: np.ndarray, Y: np.ndarray, center=True, scale=True) -> 
     return X, Y, x_mean, y_mean, x_std, y_std
 
 
-def nipals(x: np.ndarray, y: np.ndarray,
-           tol: float = 1e-10,
+def nipals(x: NDArray2D, y: NDArray2D,
+           tol: float | np.floating = 1e-10,
            max_iter: int = 10000) -> tuple[
-        np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        NDArray2D, NDArray2D, NDArray2D, NDArray2D]:
     """
     Non-linear Iterative Partial Least Squares
 
@@ -100,7 +105,7 @@ def nipals(x: np.ndarray, y: np.ndarray,
     u = y[:, 0]
     u = u[:, np.newaxis]
     i = 0
-    d: np.floating | float = tol * 10
+    d = tol * 10
     while d > tol and i <= max_iter:
         w = (x.T @ u) / (u.T @ u)
         w /= la.norm(w)
@@ -114,13 +119,13 @@ def nipals(x: np.ndarray, y: np.ndarray,
     return w, c, t, u
 
 
-def r2_score(y_true: np.ndarray, y_hat: np.ndarray, sample_weights: Optional[np.ndarray] = None) -> float:
+def r2_score(y_true: NDArray1or2D, y_hat: NDArray1or2D, sample_weights: Optional[NDArray1D] = None) -> np.floating:
     if (y_true.ndim == 1):
         y_true = y_true[:, None]
     if (y_hat.ndim == 1):
         y_hat = y_hat[:, None]
     if sample_weights is None:
-        weights: float | np.ndarray = 1.0
+        weights: float | NDArray2D = 1.0
     else:
         weights = sample_weights[:, None]
 
@@ -137,8 +142,8 @@ def r2_score(y_true: np.ndarray, y_hat: np.ndarray, sample_weights: Optional[np.
     return np.mean(1-numerator/denominator)
 
 
-def flip_scores_by_absolute_value(u: np.ndarray, v: np.ndarray):
-    """Flips u and v such that the biggest absolute value in u will have a positive sign.
+def flip_scores_by_absolute_value(u: NDArray2D, v: NDArray2D):
+    """Flips shape (n, 1) u and v such that the biggest absolute value in u will have a positive sign.
 
     Flipping makes the PLS model the same (up to machine precision) as with sklearn.
 

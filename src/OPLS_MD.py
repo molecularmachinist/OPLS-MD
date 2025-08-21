@@ -1,7 +1,7 @@
 """
 MD simulation wrappers for the PLS/OPLS objects in OPLS.py
 """
-from typing import TYPE_CHECKING, Literal, Optional, overload
+from typing import TYPE_CHECKING, Literal, Optional, overload, TypeAlias
 import numpy as np
 
 from MDAnalysis import Universe, AtomGroup  # type: ignore
@@ -9,12 +9,15 @@ from MDAnalysis import Universe, AtomGroup  # type: ignore
 from .OPLS import OPLS
 from .PLS import PLS
 from .OPLS_PLS import OPLS_PLS
+from .utils import NDArray1D, NDArray2D, NDArray1or2D, NDArray3D
 
 # A dirty hack to make the super functions be loaded only when type checking
 if TYPE_CHECKING:
     _Base_PLS = PLS
 else:
     _Base_PLS = object
+
+CoordinateData: TypeAlias = NDArray2D | NDArray3D | Universe | AtomGroup
 
 
 class _MD_PLS_WRAPPER(_Base_PLS):
@@ -25,29 +28,29 @@ class _MD_PLS_WRAPPER(_Base_PLS):
     """
     # This "Mixin" class is used instead of inheritance to be able to use he same wrappers for PLS and OPLS
 
-    def _get_dims(self, crd: np.ndarray | Universe | AtomGroup):
+    def _get_dims(self, crd: CoordinateData):
         if (type(crd) == Universe or type(crd) == AtomGroup):
             self.natoms = crd.atoms.n_atoms
             self.ndim = 3
-        else:
-            if (crd.ndim == 2):
+        elif (type(crd) == np.ndarray):
+            if (len(crd.shape) == 2):
                 self.ndim = 1
-            elif (crd.ndim == 3):
+            elif (len(crd.shape) == 3):
                 self.ndim = crd.shape[2]
             else:
                 raise ValueError(
                     f"X is {crd.ndim} dimensional, should be 2 or 3")
             self.natoms = crd.shape[1]
 
-    def _from_crd(self, crd: np.ndarray | Universe | AtomGroup) -> np.ndarray:
+    def _from_crd(self, crd: CoordinateData) -> NDArray2D:
         if (type(crd) == Universe):
             u = crd
             sel = crd.atoms
         elif (type(crd) == AtomGroup):
             u = crd.universe
             sel = crd
-        else:
-            if (crd.ndim == 2):
+        elif (type(crd) == np.ndarray):
+            if (len(crd.shape) == 2):
                 return crd
             if (crd.ndim != 3):
                 raise ValueError(f"X is {crd.ndim} dimensional, "
@@ -69,47 +72,46 @@ class _MD_PLS_WRAPPER(_Base_PLS):
             X[i] = sel.positions.ravel()
         return X
 
-    def _to_crd(self, X: np.ndarray) -> np.ndarray:
+    def _to_crd(self, X: NDArray2D) -> NDArray3D:
         return X.reshape(X.shape[0], self.natoms, self.ndim)
 
-    def fit(self, crd: np.ndarray | Universe | AtomGroup, y: np.ndarray):
+    def fit(self, crd: CoordinateData, y: NDArray1or2D):
         self._get_dims(crd)
         return super().fit(self._from_crd(crd), y)
 
     @overload
     def transform(self,
-                  crd: np.ndarray | Universe | AtomGroup,
-                  Y: np.ndarray,
+                  crd: CoordinateData,
+                  Y: NDArray2D,
                   *,
-                  copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+                  copy: bool = True) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
     def transform(self,
-                  crd: np.ndarray | Universe | AtomGroup,
+                  crd: CoordinateData,
                   Y: None = None,
                   *,
-                  copy: bool = True) -> np.ndarray:
+                  copy: bool = True) -> NDArray2D:
         ...
 
     def transform(self,
-                  crd: np.ndarray | Universe | AtomGroup,
-                  Y: Optional[np.ndarray] = None,
+                  crd: CoordinateData,
+                  Y: Optional[NDArray2D] = None,
                   *,
                   copy: bool = True):
         X = self._from_crd(crd)
         return super().transform(X, Y, copy=copy)
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray | Universe | AtomGroup:
+    def inverse_transform(self, X: NDArray2D, Y: NDArray2D) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray | Universe | AtomGroup, np.ndarray]:
+    def inverse_transform(self, X: NDArray2D, Y: None = None) -> NDArray2D:
         ...
 
-    def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> \
-            np.ndarray | Universe | AtomGroup | tuple[np.ndarray | Universe | AtomGroup, np.ndarray]:
+    def inverse_transform(self, X: NDArray2D, Y: Optional[NDArray2D] = None) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         if Y is None:
             return self._from_crd(super().inverse_transform(X))
         else:
@@ -117,14 +119,14 @@ class _MD_PLS_WRAPPER(_Base_PLS):
             return self._from_crd(X_new), Y_new
 
     def inverse_predict(self,
-                        Y: np.ndarray,
+                        Y: NDArray1or2D,
                         *,
                         ndim: Optional[int] = None,
                         copy=True):
         return self._to_crd(super().inverse_predict(Y, ndim=ndim, copy=copy))
 
     def predict(self,
-                crd: np.ndarray | Universe | AtomGroup,
+                crd: CoordinateData,
                 *,
                 ndim: Optional[int] = None,
                 copy: bool = True):
@@ -132,12 +134,12 @@ class _MD_PLS_WRAPPER(_Base_PLS):
         return super().predict(X, ndim=ndim, copy=copy)
 
     def score(self,
-              crd: np.ndarray | Universe | AtomGroup,
-              y: np.ndarray,
-              sample_weight: Optional[np.ndarray] = None,
+              crd: CoordinateData,
+              y: NDArray1or2D,
+              sample_weight: Optional[NDArray1D] = None,
               *,
               ndim: Optional[int] = None,
-              copy: bool = True) -> float:
+              copy: bool = True) -> np.floating:
         X = self._from_crd(crd)
         return super().score(X, y, sample_weight=sample_weight, ndim=ndim, copy=copy)
 
@@ -160,39 +162,39 @@ class _MD_OPLS_WRAPPER(_Base_OPLS):
     """
 
     @overload
-    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: None = None, *,
+    def correct(self, crd: CoordinateData, y: None = None, *,
                 copy: bool = True,
                 return_ortho: Literal[False] = False) -> np.ndarray:
         ...
 
     @overload
-    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: None = None, *,
+    def correct(self, crd: CoordinateData, y: None = None, *,
                 copy: bool = True,
                 return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray]:
         ...
 
     @overload
-    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: np.ndarray, *,
+    def correct(self, crd: CoordinateData, y: np.ndarray, *,
                 copy: bool = True,
                 return_ortho: Literal[False] = False) -> tuple[np.ndarray, np.ndarray]:
         ...
 
     @overload
-    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: np.ndarray, *,
+    def correct(self, crd: CoordinateData, y: np.ndarray, *,
                 copy: bool = True,
                 return_ortho: Literal[True] = True) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         ...
 
     @overload
-    def correct(self, crd: np.ndarray | Universe | AtomGroup, y: Optional[np.ndarray] = None, *,
+    def correct(self, crd: CoordinateData, y: Optional[np.ndarray] = None, *,
                 copy: bool = True,
                 return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray] |\
             tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         ...
 
     def correct(self,
-                crd: np.ndarray | Universe | AtomGroup,
-                y: Optional[np.ndarray] = None,
+                crd: CoordinateData,
+                y: Optional[NDArray2D] = None,
                 *,
                 copy: bool = True,
                 return_ortho: bool = False) -> np.ndarray | tuple[np.ndarray, ...]:

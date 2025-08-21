@@ -4,6 +4,7 @@ from scipy.linalg import pinv
 
 from .base_PLS import _PLS
 from .utils import center_scale_data, nipals, r2_score, flip_scores_by_absolute_value
+from .utils import NDArray1D, NDArray2D, NDArray1or2D
 
 
 class PLS(
@@ -47,7 +48,7 @@ class PLS(
     def __repr__(self):
         return f"{type(self).__name__}(n_components={self.n_components}, deflation_mode={repr(self.deflation_mode)})"
 
-    def fit(self, x: np.ndarray, y: np.ndarray):
+    def fit(self, x: NDArray2D, y: NDArray1or2D):
         """
         Fit PLS model.
         Parameters
@@ -190,9 +191,9 @@ class PLS(
         self.fitted = True
         return self
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *,
+    def score(self, X: NDArray2D, y: NDArray1or2D, sample_weight: Optional[NDArray1D] = None, *,
               ndim: Optional[int] = None,
-              copy: bool = True) -> float:
+              copy: bool = True) -> np.floating:
         """Predict targets of given samples.
         Parameters
         ----------
@@ -215,7 +216,7 @@ class PLS(
             raise ValueError(
                 f"Inconsistent lengths between X and y ({X.shape=}, {y.shape=})"
             )
-        yd = 1 if y.ndim == 1 else y.shape[1]
+        yd = 1 if len(y.shape) == 1 else y.shape[1]
         if (yd != self.y_loadings_.shape[0]):
             raise ValueError(
                 f"Wrong number of features in y ({y.shape=}, should be ({X.shape[0], self.y_loadings_.shape[0]}))"
@@ -231,14 +232,14 @@ class PLS(
         return r2_score(y, y_pred, sample_weights=sample_weight)
 
     @overload
-    def transform(self, X: np.ndarray, y: np.ndarray, *, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+    def transform(self, X: NDArray2D, y: NDArray2D, *, copy: bool = True) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def transform(self, X: np.ndarray, y: None = None, *, copy: bool = True) -> np.ndarray:
+    def transform(self, X: NDArray2D, y: None = None, *, copy: bool = True) -> NDArray2D:
         ...
 
-    def transform(self, X: np.ndarray, y: Optional[np.ndarray] = None, *, copy=True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def transform(self, X: NDArray2D, y: Optional[NDArray2D] = None, *, copy=True) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         """Predict latent space of given samples.
         Parameters
         ----------
@@ -280,14 +281,14 @@ class PLS(
         return x_scores
 
     @overload
-    def inverse_transform(self, x_scores: np.ndarray, y_scores: None = None) -> np.ndarray:
+    def inverse_transform(self, x_scores: NDArray2D, y_scores: NDArray2D) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def inverse_transform(self, x_scores: np.ndarray, y_scores: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def inverse_transform(self, x_scores: NDArray2D, y_scores: None = None) -> NDArray2D:
         ...
 
-    def inverse_transform(self, x_scores: np.ndarray, y_scores: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def inverse_transform(self, x_scores: NDArray2D, y_scores: Optional[NDArray2D] = None) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         """Predict latent space of given samples.
         Parameters
         ----------
@@ -332,7 +333,7 @@ class PLS(
 
         return X_hat
 
-    def predict(self, X: np.ndarray, *, ndim: Optional[int] = None, copy=True) -> np.ndarray:
+    def predict(self, X: NDArray2D, *, ndim: Optional[int] = None, copy=True) -> NDArray2D:
         """Predict targets of given samples.
         Parameters
         ----------
@@ -370,7 +371,7 @@ class PLS(
         Ypred = X @ self._all_coefs[ndim-1].T
         return Ypred + self.intercept_
 
-    def inverse_predict(self, Y: np.ndarray, *, ndim: Optional[int] = None, copy=True) -> np.ndarray:
+    def inverse_predict(self, Y: NDArray1or2D, *, ndim: Optional[int] = None, copy=True) -> NDArray2D:
         """Predict samples of given targets.
         With univariate y, this is a great way to visualize the final regression model, as this is just a linear interpolation of the coefficient vector
         along the given y-coordinates. For example:

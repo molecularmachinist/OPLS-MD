@@ -3,6 +3,7 @@ import numpy as np
 
 from .PLS import PLS
 from .OPLS import OPLS
+from .utils import NDArray1D, NDArray2D, NDArray1or2D
 
 
 class OPLS_PLS(OPLS):
@@ -87,14 +88,16 @@ class OPLS_PLS(OPLS):
     def __repr__(self):
         return f"{type(self).__name__}(n_components={self.n_components}, pls_components={self.pls_components}, algorithm={repr(self.algorithm)}, deflation_mode={repr(self.deflation_mode)})"
 
-    def fit(self, x: np.ndarray, y: np.ndarray):
+    def fit(self, x: NDArray2D, y: NDArray1or2D):
         """
         Fit OPLS and PLS models.
         Parameters
         ----------
         x: np.ndarray
             Variable matrix with shape (n_samples, n_features)
+            Variable matrix with shape (n_samples, n_features)
         y: np.ndarray
+            Dependent matrix with shape (n_samples, n_targets) or (n_samples,). For now only n_targets==1 is tested.
             Dependent matrix with shape (n_samples, n_targets) or (n_samples,). For now only n_targets==1 is tested.
 
         Returns
@@ -113,7 +116,7 @@ class OPLS_PLS(OPLS):
 
         n, xd = x.shape
 
-        if (y.ndim == 1):
+        if (len(y.shape) == 1):
             yd = 1
         else:
             yd = y.shape[1]
@@ -147,14 +150,14 @@ class OPLS_PLS(OPLS):
         return self
 
     @overload
-    def transform(self, X: np.ndarray, Y: np.ndarray, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+    def transform(self, X: NDArray2D, Y: NDArray2D, copy: bool = True) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def transform(self, X: np.ndarray, Y: None = None, copy: bool = True) -> np.ndarray:
+    def transform(self, X: NDArray2D, Y: None = None, copy: bool = True) -> NDArray2D:
         ...
 
-    def transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None, copy: bool = True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def transform(self, X: NDArray2D, Y: Optional[NDArray2D] = None, copy: bool = True) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         """Remove the orthogonal components and apply the dimension reduction.
 
         Parameters
@@ -180,49 +183,55 @@ class OPLS_PLS(OPLS):
         return self._pls.transform(x_filt, y_filt, copy=copy)
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+    def inverse_transform(self, X: NDArray2D, Y: None = None) -> NDArray2D:
         ...
 
     @overload
-    def inverse_transform(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def inverse_transform(self, X: NDArray2D, Y: NDArray2D) -> tuple[NDArray2D, NDArray2D]:
         ...
 
-    def inverse_transform(self, X: np.ndarray, Y: Optional[np.ndarray] = None):
+    def inverse_transform(self, X: NDArray2D, Y: Optional[NDArray2D] = None):
         """calculate inverse of the dimension reduction.
 
         Parameters
         ----------
         X : np.ndarray
             shape(n_samples, n_comp) scores to inverse transform.
+            shape(n_samples, n_comp) scores to inverse transform.
         Y : np.ndarray, default=None
+            shape(n_samples, n_comp) scores to inverse transform (optional)
             shape(n_samples, n_comp) scores to inverse transform (optional)
 
         Returns
         -------
         x_scores : np.ndarray
             shape(n_samples, n_features) estimate of X-coordinates.
+            shape(n_samples, n_features) estimate of X-coordinates.
         y_scores : np.ndarray
+            shape(n_samples, n_targets) estimate of y-targets, only returned if Y is not None.
             shape(n_samples, n_targets) estimate of y-targets, only returned if Y is not None.
         """
         return self._pls.inverse_transform(X, Y)
 
     @overload
-    def transform_ortho(self, X: np.ndarray, Y: np.ndarray, *, copy: bool = True) -> tuple[np.ndarray, np.ndarray]:
+    def transform_ortho(self, X: NDArray2D, Y: NDArray2D, *, copy: bool = True) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def transform_ortho(self, X: np.ndarray, Y: None = None, *, copy: bool = True) -> np.ndarray:
+    def transform_ortho(self, X: NDArray2D, Y: None = None, *, copy: bool = True) -> NDArray2D:
         ...
 
-    def transform_ortho(self, X: np.ndarray, Y: Optional[np.ndarray] = None, *,
-                        copy: bool = True) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def transform_ortho(self, X: NDArray2D, Y: Optional[NDArray2D] = None, *,
+                        copy: bool = True) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         """Apply the dimension reduction to get the orthogonal components.
 
         Parameters
         ----------
         X : np.ndarray
             shape(n_samples, n_features) coordinates to transform.
+            shape(n_samples, n_features) coordinates to transform.
         Y : np.ndarray, default=None
+            shape(n_samples, n_targets) targets to transform (optional)
             shape(n_samples, n_targets) targets to transform (optional)
         copy : bool, default=True
             Whether to copy `X` and `Y`, or perform in-place normalization.
@@ -231,48 +240,54 @@ class OPLS_PLS(OPLS):
         -------
         x_scores : np.ndarray
             shape(n_samples, n_comp) orthogonal x-scores.
+            shape(n_samples, n_comp) orthogonal x-scores.
         y_scores : np.ndarray
+            shape(n_samples, n_comp) orthogonal y-scores OR unchanged Y if algorithm=="OPLS"
             shape(n_samples, n_comp) orthogonal y-scores OR unchanged Y if algorithm=="OPLS"
             only returned if Y is not None.
         """
         return super().transform(X, Y, copy=copy)
 
     @overload
-    def inverse_transform_ortho(self, X: np.ndarray, Y: None = None) -> np.ndarray:
+    def inverse_transform_ortho(self, X: NDArray2D, Y: NDArray2D) -> tuple[NDArray2D, NDArray2D]:
         ...
 
     @overload
-    def inverse_transform_ortho(self, X: np.ndarray, Y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def inverse_transform_ortho(self, X: NDArray2D, Y: None = None) -> NDArray2D:
         ...
 
-    def inverse_transform_ortho(self, X: np.ndarray, Y: Optional[np.ndarray] = None) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    def inverse_transform_ortho(self, X: NDArray2D, Y: Optional[NDArray2D] = None) -> NDArray2D | tuple[NDArray2D, NDArray2D]:
         """calculate inverse of the dimension reduction.
 
         Parameters
         ----------
         X : np.ndarray
             shape(n_samples, n_comp) scores to inverse transform.
+            shape(n_samples, n_comp) scores to inverse transform.
         Y : np.ndarray, default=None
+            shape(n_samples, n_comp) scores to inverse transform (optional)
             shape(n_samples, n_comp) scores to inverse transform (optional)
 
         Returns
         -------
         x_scores : np.ndarray
             shape(n_samples, n_features) estimate of X-coordinates.
+            shape(n_samples, n_features) estimate of X-coordinates.
         y_scores : np.ndarray
+            shape(n_samples, n_targets) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
             shape(n_samples, n_targets) estimate of y-targets OR unchanged Y if algorithm=="OPLS"
             only returned if Y is not None.
         """
         return super().inverse_transform(X, Y)
 
-    def predict(self, X: np.ndarray, *, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
+    def predict(self, X: NDArray2D, *, ndim: Optional[int] = None, copy: bool = True) -> NDArray2D:
         X_new = self.correct(X, copy=copy)
         return self.pls_.predict(X_new, ndim=ndim, copy=copy)
 
-    def inverse_predict(self, Y: np.ndarray, *, ndim: Optional[int] = None, copy: bool = True) -> np.ndarray:
+    def inverse_predict(self, Y: NDArray2D, *, ndim: Optional[int] = None, copy: bool = True) -> NDArray2D:
         return self.pls_.inverse_predict(Y, ndim=ndim, copy=copy)
 
-    def score(self, X: np.ndarray, y: np.ndarray, sample_weight: Optional[np.ndarray] = None, *,
+    def score(self, X: NDArray2D, y: NDArray1or2D, sample_weight: Optional[NDArray1D] = None, *,
               ndim: Optional[int] = None,
-              copy: bool = True) -> float:
+              copy: bool = True) -> np.floating:
         return self.pls_.score(*self.correct(X, y, copy=copy), sample_weight=sample_weight, ndim=ndim, copy=copy)
