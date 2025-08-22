@@ -40,6 +40,7 @@ if (True):
     assert np.abs(pls_sklearn.score(X_test, y_test) -
                   pls.score(X_test, y_test)) < 1e-10
 
+quit()
 if (True):
     fig1, axes1 = plt.subplots(1, 2)
     fig2, axes2 = plt.subplots(1, 2)

@@ -2,6 +2,14 @@
 
 OPLS and PLS regressors with some utility to help with molecular dynamics (MD) simulation analysis.
 
+## Requirements
+
+As long as your Python is a correct version, the two other dependencies will be installed automatically by pip.
+
+- `python>=3.10`
+- `numpy>=2.0`
+- `scipy>=1.0`
+
 ## Installation
 
 Run
