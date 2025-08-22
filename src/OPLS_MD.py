@@ -4,7 +4,13 @@ MD simulation wrappers for the PLS/OPLS objects in OPLS.py
 from typing import TYPE_CHECKING, Literal, Optional, overload
 import numpy as np
 
-from MDAnalysis import Universe, AtomGroup  # type: ignore
+try:
+    from MDAnalysis import Universe, AtomGroup  # type: ignore
+except ImportError as e:
+    _reason = e
+    if (not TYPE_CHECKING):
+        Universe = None
+        AtomGroup = None
 
 from .OPLS import OPLS
 from .PLS import PLS
