@@ -318,7 +318,7 @@ class OPLS(
             only returned if Y is not None.
         """
         self.check_is_fitted()
-        X = self._validate_array(X, variable_name="Y")
+        X = self._validate_array(X, variable_name="Y", ensure_min_samples=1)
         # Normalize
         X -= self._x_mean
         X /= self._x_std
@@ -328,7 +328,7 @@ class OPLS(
             if (self.algorithm == "OPLS"):
                 return x_scores, Y
             Y = self._validate_array(
-                Y, variable_name="Y", ensure_2d=False, copy=copy
+                Y, variable_name="Y", ensure_2d=False, copy=copy, ensure_min_samples=1
             )
             if Y.ndim == 1:
                 Y = Y[:, np.newaxis]
@@ -366,7 +366,7 @@ class OPLS(
             only returned if Y is not None.
         """
         self.check_is_fitted()
-        X = self._validate_array(X, variable_name="X")
+        X = self._validate_array(X, variable_name="X", ensure_min_samples=1)
         # calculate scores
         x_new = X @ self._Portho.T
         x_new *= self._x_std
@@ -375,7 +375,7 @@ class OPLS(
         if Y is not None:
             if (self.algorithm == "OPLS"):
                 return x_new, Y
-            Y = self._validate_array(Y, variable_name="Y")
+            Y = self._validate_array(Y, variable_name="Y", ensure_min_samples=1)
             y_new = Y @ self._Qortho.T
             y_new *= self._y_std
             y_new += self._y_mean
@@ -446,9 +446,9 @@ class OPLS(
         """
         self.check_is_fitted()
         if (not y is None):
-            x_new, y_new = self.validate_input(X, y, copy=copy)
+            x_new, y_new = self.validate_input(X, y, copy=copy, ensure_min_samples=1)
         else:
-            x_new = self._validate_array(X, variable_name="X", copy=copy)
+            x_new = self._validate_array(X, variable_name="X", copy=copy, ensure_min_samples=1)
         x_new -= self._x_mean
         x_new /= self._x_std
         n, xd = x_new.shape

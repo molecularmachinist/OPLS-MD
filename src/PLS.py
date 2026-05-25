@@ -263,9 +263,9 @@ class PLS(
         """
         self.check_is_fitted()
         if (y is not None):
-            X, y = self.validate_input(X, y, copy=copy)
+            X, y = self.validate_input(X, y, copy=copy, ensure_min_samples=1)
         else:
-            X = self._validate_array(X, variable_name="X", copy=copy)
+            X = self._validate_array(X, variable_name="X", copy=copy, ensure_min_samples=1)
         X -= self._x_mean
         X /= self._x_std
 
@@ -314,11 +314,13 @@ class PLS(
         if (y_scores is not None):
             x_scores, y_scores = self.validate_input(x_scores,
                                                      y_scores,
-                                                     copy=False)
+                                                     copy=False,
+                                                     ensure_min_samples=1)
         else:
             x_scores = self._validate_array(x_scores,
                                             variable_name="X",
-                                            copy=False)
+                                            copy=False,
+                                            ensure_min_samples=1)
 
         X_hat = x_scores @ self.x_loadings_.T
         X_hat *= self._x_std
@@ -362,7 +364,7 @@ class PLS(
             raise ValueError(
                 f"ndim is bigger than the number of components this object was trained with")
 
-        X = self._validate_array(X, variable_name="X", copy=copy)
+        X = self._validate_array(X, variable_name="X", copy=copy, ensure_min_samples=1)
         # Normalize
         X -= self._x_mean
         X /= self._x_std
@@ -407,7 +409,7 @@ class PLS(
                 f"ndim is bigger than the number of components this object was trained with")
 
         Y = self._validate_array(
-            Y, variable_name="Y", ensure_2d=False, copy=copy
+            Y, variable_name="Y", ensure_2d=False, copy=copy, ensure_min_samples=1
         )
         # Center the Y values. _coef_ already has
         Y -= self.intercept_
