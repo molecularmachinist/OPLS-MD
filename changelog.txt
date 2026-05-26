@@ -1,3 +1,10 @@
+v0.1.1:
+    - Prediction and transformations can be done on single datapoints
+
+v0.1.0
+    - requires python>=3.10
+    - Removed dependencies on sklearn and MDanalysis
+
 v0.0.6:
     - refactoring
 
